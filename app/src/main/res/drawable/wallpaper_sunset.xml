@@ -1,0 +1,128 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="1920dp"
+    android:height="1080dp"
+    android:viewportWidth="1920"
+    android:viewportHeight="1080">
+
+    <!-- Sky Background Gradient -->
+    <path
+        android:pathData="M0,0h1920v1080h-1920z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="0"
+                android:endX="960"
+                android:endY="1080"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF0B0E17"/>
+                <item android:offset="0.35" android:color="#FF151B30"/>
+                <item android:offset="0.65" android:color="#FF2D1C3C"/>
+                <item android:offset="0.85" android:color="#FF4C1D42"/>
+                <item android:offset="1.0" android:color="#FF1E0F24"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Glowing Celestial Sun/Moon -->
+    <path
+        android:pathData="M960,540m-260,0a260,260 0,1 1,520 0a260,260 0,1 1,-520 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="280"
+                android:endX="960"
+                android:endY="800"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#44F43F5E"/>
+                <item android:offset="0.5" android:color="#22FB923C"/>
+                <item android:offset="1.0" android:color="#00000000"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:pathData="M960,540m-140,0a140,140 0,1 1,280 0a140,140 0,1 1,-280 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="400"
+                android:endX="960"
+                android:endY="680"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#88FB7185"/>
+                <item android:offset="0.7" android:color="#44F43F5E"/>
+                <item android:offset="1.0" android:color="#00000000"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Mountain Layers -->
+    <!-- Far Mountains -->
+    <path
+        android:pathData="M-50,750 L380,480 L820,680 L1240,430 L1680,690 L2000,520 L2000,1100 L-50,1100 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="430"
+                android:endX="960"
+                android:endY="1080"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#AA1E1233"/>
+                <item android:offset="1.0" android:color="#FF0D0817"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Mid Mountains -->
+    <path
+        android:pathData="M-50,830 L220,620 L660,820 L1040,580 L1460,780 L1850,590 L2000,690 L2000,1100 L-50,1100 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="580"
+                android:endX="960"
+                android:endY="1080"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#DD160D26"/>
+                <item android:offset="1.0" android:color="#FF090510"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Foreground Ridge & Bottom Dark Vignette -->
+    <path
+        android:pathData="M-50,920 L450,760 L980,880 L1520,740 L2000,860 L2000,1100 L-50,1100 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="740"
+                android:endX="960"
+                android:endY="1080"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#EE0D0717"/>
+                <item android:offset="0.4" android:color="#FF09060E"/>
+                <item android:offset="1.0" android:color="#FF050308"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bottom Scrim for Dock Legibility -->
+    <path
+        android:pathData="M0,600h1920v480h-1920z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="960"
+                android:startY="600"
+                android:endX="960"
+                android:endY="1080"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00000000"/>
+                <item android:offset="0.5" android:color="#88050308"/>
+                <item android:offset="1.0" android:color="#EE050308"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>
+

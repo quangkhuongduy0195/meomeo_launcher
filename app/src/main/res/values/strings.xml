@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">MeoMeo Launcher</string>
+    <string name="favorites">Yêu thích</string>
+    <string name="all_apps">Ứng dụng</string>
+    <string name="settings">Cài đặt</string>
+    <string name="no_apps">Chưa có ứng dụng nào</string>
+    <string name="app_options">Tùy chọn ứng dụng</string>
+    <string name="add_to_favorites">Thêm vào yêu thích</string>
+    <string name="remove_from_favorites">Xóa khỏi yêu thích</string>
+    <string name="app_info">Thông tin ứng dụng</string>
+    <string name="uninstall">Gỡ cài đặt</string>
+    <string name="open_settings">Cài đặt hệ thống</string>
+    <string name="include_sideload_apps">Hiển thị ứng dụng di động (Sideload)</string>
+</resources>
+
