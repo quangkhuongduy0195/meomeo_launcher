@@ -1,29 +1,25 @@
 package com.meomeo.tvlauncher.ui.components
 
-import com.meomeo.tvlauncher.ui.theme.glassFill
+import android.graphics.Bitmap
 import android.view.KeyEvent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,74 +36,73 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.meomeo.tvlauncher.model.AppInfo
 import com.meomeo.tvlauncher.ui.theme.Accent
-import com.meomeo.tvlauncher.ui.theme.AccentGlow
+import com.meomeo.tvlauncher.ui.theme.AppIconShape
 import com.meomeo.tvlauncher.ui.theme.ColorExtractor
 import com.meomeo.tvlauncher.ui.theme.StarYellow
-import com.meomeo.tvlauncher.ui.theme.TextPrimary
-import com.meomeo.tvlauncher.ui.theme.TextSecondary
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
 
+/** Resting size of a dock icon. Focused icons magnify from here, macOS style. */
+val DockIconSize: Dp = 56.dp
+
+/** Magnification of the item at [distance] slots from the focused one (0 = the focused item). */
+fun dockMagnification(distance: Int): Float = when (distance) {
+    0 -> 1.6f
+    1 -> 1.3f
+    2 -> 1.1f
+    else -> 1f
+}
+
+/**
+ * One slot in the dock. The slot's layout width grows with [magnification] so neighbours slide
+ * apart, while the icon itself scales up from its bottom edge (so it rises out of the dock). A
+ * name pill floats above the focused icon.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DockCard(
-    slotIndex: Int,
-    app: AppInfo?,
-    onFocusGain: (AppInfo?, Color) -> Unit,
+private fun DockSlot(
+    label: String,
+    magnification: Float,
+    onFocusChange: (Boolean) -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onLongClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    icon: @Composable BoxScope.() -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-
-    val iconBitmap = remember(app?.packageName) {
-        if (app != null) drawableToBitmap(app.icon ?: app.banner) else null
-    }
-
-    val dominantColor = remember(app?.packageName, iconBitmap) {
-        ColorExtractor.getDominantColor(app?.packageName ?: "default", iconBitmap)
-    }
-
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.15f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "dockCardScale"
+        targetValue = magnification,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium),
+        label = "dockMagnify"
     )
 
-
-
-    val cardShape = RoundedCornerShape(18.dp)
-
-    Column(
+    Box(
         modifier = modifier
-            .width(80.dp)
-            .scale(scale)
+            .width(DockIconSize * scale)
+            .height(DockIconSize)
             .zIndex(if (isFocused) 20f else 1f)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-                if (focusState.isFocused) {
-                    onFocusGain(app, dominantColor)
-                }
+            .onFocusChanged {
+                isFocused = it.isFocused
+                onFocusChange(it.isFocused)
             }
             .onKeyEvent { keyEvent ->
-                if (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU &&
+                // Remote MENU key behaves like a long press.
+                if (onLongClick != null &&
+                    keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU &&
                     keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP
                 ) {
                     onLongClick()
@@ -123,160 +118,158 @@ fun DockCard(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.BottomCenter
     ) {
-        // Floating Card with dynamic glow halo
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .clip(cardShape)
-                .background(glassFill(isFocused))
-,
-            contentAlignment = Alignment.Center
-        ) {
-            if (app != null && iconBitmap != null) {
-                // High-resolution floating icon
-                Image(
-                    bitmap = iconBitmap.asImageBitmap(),
-                    contentDescription = app.label,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(11.dp)),
-                    contentScale = ContentScale.Fit
-                )
+                .size(DockIconSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                },
+            content = icon
+        )
 
-                // Favorite Star Badge
-                if (app.isFavorite) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(5.dp)
-                            .size(16.dp)
-                            .background(Color.Black.copy(alpha = 0.65f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Favorite",
-                            tint = StarYellow,
-                            modifier = Modifier.size(10.dp)
-                        )
-                    }
-                }
-            } else if (app == null) {
-                // Empty slot prompt
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = "Gán app",
-                        tint = if (isFocused) Color.White else TextSecondary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+        if (isFocused) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .wrapContentSize(Alignment.BottomCenter, unbounded = true)
+                    .offset(y = -(DockIconSize * scale) - 10.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // App Title below
-        Text(
-            text = app?.label ?: "Trống",
-            fontSize = 12.sp,
-            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
-            color = if (isFocused) Color.White else TextSecondary.copy(alpha = 0.9f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp)
-        )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun DockCard(
+    slotIndex: Int,
+    app: AppInfo?,
+    magnification: Float,
+    onFocusGain: (AppInfo?, Color) -> Unit,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val iconBitmap = remember(app?.packageName) {
+        if (app != null) drawableToBitmap(app.icon ?: app.banner) else null
+    }
+    val dominantColor = remember(app?.packageName, iconBitmap) {
+        ColorExtractor.getDominantColor(app?.packageName ?: "default", iconBitmap)
+    }
+
+    DockSlot(
+        label = app?.label ?: "Trống",
+        magnification = magnification,
+        onFocusChange = { focused -> if (focused) onFocusGain(app, dominantColor) },
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier
+    ) {
+        if (app != null && iconBitmap != null) {
+            AppDockIcon(bitmap = iconBitmap, label = app.label)
+            if (app.isFavorite) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(2.dp)
+                        .size(16.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = "Yêu thích", tint = StarYellow, modifier = Modifier.size(10.dp))
+                }
+            }
+        } else {
+            GlassDockTile {
+                Icon(Icons.Rounded.Add, contentDescription = "Gán app", tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
+            }
+        }
+    }
+}
+
 @Composable
 fun AllAppsDockCard(
+    magnification: Float,
     onFocusGain: (Color) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.15f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "allAppsCardScale"
-    )
-
-
-
-    val cardShape = RoundedCornerShape(18.dp)
-
-    Column(
+    DockSlot(
+        label = "Tất cả ứng dụng",
+        magnification = magnification,
+        onFocusChange = { focused -> if (focused) onFocusGain(Accent) },
+        onClick = onClick,
+        onLongClick = null,
         modifier = modifier
-            .width(80.dp)
-            .scale(scale)
-            .zIndex(if (isFocused) 20f else 1f)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-                if (focusState.isFocused) {
-                    onFocusGain(Accent)
-                }
-            }
-            .onKeyEvent { keyEvent ->
-                if ((keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER ||
-                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
-                    keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Floating Card with dynamic glow halo
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(cardShape)
-                .background(glassFill(isFocused))
-,
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Apps,
-                contentDescription = "Tất cả ứng dụng",
-                tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.95f),
-                modifier = Modifier.size(30.dp)
+        // Launchpad-style tile
+        GlassDockTile {
+            Icon(Icons.Rounded.Apps, contentDescription = "Tất cả ứng dụng", tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+/** An app icon drawn straight onto the dock, rounded like a macOS icon. */
+@Composable
+private fun AppDockIcon(bitmap: Bitmap, label: String) {
+    // Icons that are just a glyph on transparency (Play Store, Settings...) float awkwardly on the
+    // glass, so give them a tile. Icons with their own background are drawn full-bleed.
+    val hasOwnBackground = remember(bitmap) { bitmap.hasOpaqueEdges() }
+    if (hasOwnBackground) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = label,
+            modifier = Modifier.fillMaxSize().clip(AppIconShape),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        GlassDockTile {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize().padding(9.dp),
+                contentScale = ContentScale.Fit
             )
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Label below
-        Text(
-            text = "Tất cả",
-            fontSize = 12.sp,
-            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
-            color = if (isFocused) Color.White else TextSecondary.copy(alpha = 0.95f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp)
-        )
     }
+}
+
+@Composable
+private fun GlassDockTile(content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(AppIconShape)
+            .background(glassIdleColor()),
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
+
+/** True when the middle of each edge is (nearly) opaque, i.e. the icon has its own background. */
+private fun Bitmap.hasOpaqueEdges(): Boolean {
+    if (width < 8 || height < 8) return false
+    val inset = (width * 0.04f).toInt().coerceAtLeast(1)
+    val points = listOf(
+        inset to height / 2,
+        width - 1 - inset to height / 2,
+        width / 2 to inset,
+        width / 2 to height - 1 - inset
+    )
+    val alphaSum = points.sumOf { (x, y) -> (getPixel(x, y) ushr 24).toInt() }
+    return alphaSum / points.size >= 200
 }

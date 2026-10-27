@@ -1,5 +1,8 @@
 package com.meomeo.tvlauncher.ui
 
+import androidx.compose.ui.focus.onFocusChanged
+import com.meomeo.tvlauncher.ui.components.dockMagnification
+import kotlin.math.abs
 import com.meomeo.tvlauncher.ui.components.LockScreen
 import android.os.Build
 import androidx.compose.foundation.layout.offset
@@ -116,6 +119,8 @@ fun MainScreen(
     val dockRequesters = remember(dockItemCount) { List(dockItemCount) { FocusRequester() } }
     val dockFocusRequester = dockRequesters[0]
     var lastDockFocusIndex by remember { mutableIntStateOf(0) }
+    // Dock magnification only applies while focus is actually inside the dock.
+    var dockHasFocus by remember { mutableStateOf(false) }
 
     val isAnyDialogOpen = uiState.selectedAppForMenu != null ||
         uiState.isSettingsOpen ||
@@ -301,15 +306,23 @@ fun MainScreen(
                                     .border(1.2.dp, Color.White.copy(alpha = 0.12f), capsuleShape)
                             )
                         }
+                        val focusedDockIndex = if (dockHasFocus) lastDockFocusIndex else -1
+                        fun magnificationFor(index: Int): Float =
+                            if (focusedDockIndex < 0) 1f else dockMagnification(abs(index - focusedDockIndex))
+
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .onFocusChanged { dockHasFocus = it.hasFocus },
+                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                            // Bottom-aligned so magnified icons rise out of the dock like macOS.
+                            verticalAlignment = Alignment.Bottom
                         ) {
                             uiState.dockApps.forEachIndexed { index, app ->
                                 DockCard(
                                     slotIndex = index,
                                     app = app,
+                                    magnification = magnificationFor(index),
                                     onFocusGain = { focusedApp, color ->
                                         lastDockFocusIndex = index
                                         isAllAppsFocused = false
@@ -338,8 +351,18 @@ fun MainScreen(
                                 )
                             }
 
+                            // Divider, like the one before the Trash in the macOS dock
+                            Box(
+                                modifier = Modifier
+                                    .padding(bottom = 8.dp)
+                                    .width(1.5.dp)
+                                    .height(40.dp)
+                                    .background(Color.White.copy(alpha = 0.25f))
+                            )
+
                             // 8th Permanent Slot: "Tất cả" (All Apps) Shortcut
                             AllAppsDockCard(
+                                magnification = magnificationFor(uiState.dockApps.size),
                                 onFocusGain = { color ->
                                     lastDockFocusIndex = uiState.dockApps.size
                                     isAllAppsFocused = true
