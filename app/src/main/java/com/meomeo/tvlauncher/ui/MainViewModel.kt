@@ -109,7 +109,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadApps() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            // Only block the UI with a spinner on the first load. onResume reloads on every return
+            // to Home; swapping the whole screen for a spinner there causes a flash and loses focus.
+            _uiState.update { it.copy(isLoading = it.allApps.isEmpty()) }
             val apps = repository.getInstalledApps(includeSideload = _uiState.value.includeSideload)
             val favorites = apps.filter { it.isFavorite }
 
@@ -210,7 +212,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (it.packageName == app.packageName) it.copy(isFavorite = willBeFav) else it
             }
             val updatedFav = updatedAll.filter { it.isFavorite }
-            state.copy(allApps = updatedAll, favoriteApps = updatedFav)
+            // Dock holds its own copies of AppInfo; keep them in sync so the star badge updates.
+            val updatedDock = state.dockApps.map { dockApp ->
+                if (dockApp?.packageName == app.packageName) dockApp.copy(isFavorite = willBeFav) else dockApp
+            }
+            state.copy(allApps = updatedAll, favoriteApps = updatedFav, dockApps = updatedDock)
         }
     }
 

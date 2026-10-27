@@ -80,10 +80,7 @@ fun AppCard(
         label = "cardScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White.copy(alpha = 0.9f) else Color.Transparent,
-        label = "cardBorder"
-    )
+
 
     val backgroundColor by animateColorAsState(
         targetValue = if (isFocused) BgCardFocused else BgCard,
@@ -131,11 +128,7 @@ fun AppCard(
                 )
                 .clip(RoundedCornerShape(18.dp))
                 .background(backgroundColor)
-                .border(
-                    width = if (isFocused) 2.5.dp else 1.dp,
-                    color = if (isFocused) borderColor else Color.White.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(18.dp)
-                ),
+,
             contentAlignment = Alignment.Center
         ) {
             if (app.banner != null && iconBitmap != null) {

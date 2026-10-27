@@ -1,5 +1,10 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.AppIconShape
+import com.meomeo.tvlauncher.ui.theme.DialogDim
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -130,6 +135,7 @@ fun DockCustomizerDialog(
             dismissOnClickOutside = false
         )
     ) {
+        DialogDim()
         // Intercept back button when inside picker mode inside the Dialog window
         BackHandler(enabled = pickingForSlot != null) {
             pickingForSlot = null
@@ -139,7 +145,7 @@ fun DockCustomizerDialog(
                 .fillMaxWidth(0.90f) // Spacious Cinema ratio
                 .fillMaxHeight(0.88f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF090D18))
+                .background(glassIdleColor())
                 .border(1.5.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(32.dp))
         ) {
             // Dynamic Ambient Aura in Background
@@ -228,7 +234,7 @@ fun DockCustomizerDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.White.copy(alpha = 0.10f))
+                                    .background(glassIdleColor())
                                     .padding(horizontal = 14.dp, vertical = 6.dp)
                             ) {
                                 Text(
@@ -259,15 +265,7 @@ fun DockCustomizerDialog(
                                         spotColor = ambientColor
                                     )
                                     .clip(RoundedCornerShape(26.dp))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.White.copy(alpha = 0.22f),
-                                                Color(0xEE1E2436)
-                                            )
-                                        )
-                                    )
-                                    .border(2.5.dp, Color.White, RoundedCornerShape(26.dp)),
+                                    .background(glassFocusedColor()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (currentBitmap != null) {
@@ -346,14 +344,7 @@ fun DockCustomizerDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(28.dp))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.White.copy(alpha = 0.08f),
-                                                Color.Black.copy(alpha = 0.40f)
-                                            )
-                                        )
-                                    )
+                                    .background(glassIdleColor())
                                     .border(1.2.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(28.dp))
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 contentAlignment = Alignment.Center
@@ -405,9 +396,7 @@ fun DockCustomizerDialog(
                                         .size(46.dp)
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(
-                                            Brush.linearGradient(
-                                                colors = listOf(Accent, AccentGlow)
-                                            )
+                                            Brush.linearGradient(colors = listOf(glassFocusedColor(), glassFocusedColor()))
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -433,7 +422,7 @@ fun DockCustomizerDialog(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Accent)
+                                                .background(glassFocusedColor())
                                                 .padding(horizontal = 10.dp, vertical = 2.dp)
                                         ) {
                                             Text(
@@ -460,7 +449,7 @@ fun DockCustomizerDialog(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(Color.White.copy(alpha = 0.12f))
+                                        .background(glassIdleColor())
                                         .clickable { pickingForSlot = null }
                                         .padding(horizontal = 14.dp, vertical = 6.dp)
                                 ) {
@@ -539,10 +528,7 @@ fun StageSlotCard(
         label = "stageSlotScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else if (isCurrentlyActive) slotColor else Color.White.copy(alpha = 0.12f),
-        label = "stageSlotBorder"
-    )
+
 
     val cardShape = RoundedCornerShape(22.dp)
 
@@ -568,7 +554,7 @@ fun StageSlotCard(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (isFocused || isCurrentlyActive) slotColor else Color.White.copy(alpha = 0.12f))
+                .background(if (isFocused || isCurrentlyActive) glassFocusedColor() else glassIdleColor())
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
             Text(
@@ -585,35 +571,8 @@ fun StageSlotCard(
         Box(
             modifier = Modifier
                 .size(76.dp)
-                .shadow(
-                    elevation = if (isFocused) 20.dp else 4.dp,
-                    shape = cardShape,
-                    ambientColor = if (isFocused) slotColor else Color.Black,
-                    spotColor = if (isFocused) slotColor else Color.Black
-                )
                 .clip(cardShape)
-                .background(
-                    if (isFocused) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.28f),
-                                Color(0xDD1B2234)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.10f),
-                                Color(0xB30F131F)
-                            )
-                        )
-                    }
-                )
-                .border(
-                    width = if (isFocused) 3.dp else 1.2.dp,
-                    color = borderColor,
-                    shape = cardShape
-                ),
+                .background(glassFill(isFocused)),
             contentAlignment = Alignment.Center
         ) {
             if (iconBitmap != null) {
@@ -676,10 +635,7 @@ fun PickerAppTile(
         label = "pickerTileScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else if (isSelectedCurrent) Accent else Color.White.copy(alpha = 0.08f),
-        label = "pickerTileBorder"
-    )
+
 
     val tileShape = RoundedCornerShape(22.dp)
 
@@ -688,36 +644,9 @@ fun PickerAppTile(
             .fillMaxWidth()
             .scale(scale)
             .zIndex(if (isFocused) 10f else 1f)
-            .shadow(
-                elevation = if (isFocused) 20.dp else 0.dp,
-                shape = tileShape,
-                ambientColor = dominantColor,
-                spotColor = dominantColor
-            )
             .clip(tileShape)
-            .background(
-                if (isFocused) {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.22f),
-                            dominantColor.copy(alpha = 0.35f),
-                            Color(0xDD151A29)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.06f),
-                            Color(0x66151A29)
-                        )
-                    )
-                }
-            )
-            .border(
-                width = if (isFocused) 2.5.dp else if (isSelectedCurrent) 1.8.dp else 1.dp,
-                color = borderColor,
-                shape = tileShape
-            )
+            .background(glassFill(isFocused))
+
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -729,22 +658,16 @@ fun PickerAppTile(
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .shadow(
-                    elevation = if (isFocused) 12.dp else 4.dp,
-                    shape = RoundedCornerShape(18.dp),
-                    ambientColor = dominantColor,
-                    spotColor = dominantColor
-                )
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color.White.copy(alpha = 0.12f)),
+                .size(60.dp),
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = app.label,
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(AppIconShape),
                     contentScale = ContentScale.Fit
                 )
             }
@@ -758,7 +681,7 @@ fun PickerAppTile(
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
                         contentDescription = "Đang chọn",
-                        tint = Accent,
+                        tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }

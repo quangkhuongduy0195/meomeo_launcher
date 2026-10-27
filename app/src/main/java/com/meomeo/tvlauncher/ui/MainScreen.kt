@@ -1,5 +1,26 @@
 package com.meomeo.tvlauncher.ui
 
+import android.os.Build
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import com.meomeo.tvlauncher.ui.theme.DockBackdropBlur
+import com.meomeo.tvlauncher.ui.theme.DialogBackdropBlur
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.graphics.BitmapFactory
+import com.meomeo.tvlauncher.ui.theme.ColorExtractor
+import com.meomeo.tvlauncher.ui.theme.LocalGlassPalette
+import com.meomeo.tvlauncher.ui.theme.glassPalette
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -34,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,6 +88,8 @@ import com.meomeo.tvlauncher.ui.components.AppContextMenuDialog
 import com.meomeo.tvlauncher.ui.components.AppPickerDialog
 import com.meomeo.tvlauncher.ui.components.DockCard
 import com.meomeo.tvlauncher.ui.components.DockCustomizerDialog
+import com.meomeo.tvlauncher.ui.components.HeroContent
+import com.meomeo.tvlauncher.ui.components.HeroSection
 import com.meomeo.tvlauncher.ui.components.SettingsDialog
 import com.meomeo.tvlauncher.ui.components.TopHeader
 import com.meomeo.tvlauncher.ui.components.WallpaperPickerDialog
@@ -85,7 +109,19 @@ fun MainScreen(
     var isAllAppsFocused by remember { mutableStateOf(false) }
 
     val settingsFocusRequester = remember { FocusRequester() }
-    val dockFocusRequester = remember { FocusRequester() }
+    // One requester per dock item (apps + the trailing "All apps" card) so focus can be restored
+    // to exactly where the user was after a dialog closes.
+    val dockItemCount = uiState.dockApps.size + 1
+    val dockRequesters = remember(dockItemCount) { List(dockItemCount) { FocusRequester() } }
+    val dockFocusRequester = dockRequesters[0]
+    var lastDockFocusIndex by remember { mutableIntStateOf(0) }
+
+    val isAnyDialogOpen = uiState.selectedAppForMenu != null ||
+        uiState.isSettingsOpen ||
+        uiState.isDockCustomizerOpen ||
+        uiState.isWallpaperPickerOpen ||
+        uiState.isAllAppsDialogOpen ||
+        uiState.slotPickingFor != null
 
     val ambientGlow by animateColorAsState(
         targetValue = activeColor,
@@ -97,6 +133,17 @@ fun MainScreen(
         if (!uiState.isLoading && uiState.dockApps.isNotEmpty()) {
             try {
                 dockFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Dialogs live in their own windows, so closing one leaves the dock without focus.
+    // Put it back on the last focused dock item so the next D-pad press behaves as expected.
+    androidx.compose.runtime.LaunchedEffect(isAnyDialogOpen) {
+        if (!isAnyDialogOpen && !uiState.isLoading) {
+            kotlinx.coroutines.delay(150)
+            try {
+                dockRequesters[lastDockFocusIndex.coerceIn(0, dockRequesters.lastIndex)].requestFocus()
             } catch (_: Exception) {}
         }
     }
@@ -118,130 +165,44 @@ fun MainScreen(
         else -> R.drawable.wallpaper_sunset
     }
 
+    // --- Glass tint: wallpaper tone (stable) + focused app tone (for the focused fill only).
+    val currentPhotoFile = uiState.googlePhotos.getOrNull(uiState.currentGooglePhotoIndex)
+        ?: uiState.googlePhotos.firstOrNull()
+    val sunsetTone = Color(0xFFFFB98A)
+    val photoTone by produceState(sunsetTone, currentPhotoFile) {
+        value = if (currentPhotoFile != null && currentPhotoFile.exists()) {
+            withContext(Dispatchers.IO) {
+                val opts = BitmapFactory.Options().apply { inSampleSize = 16 }
+                BitmapFactory.decodeFile(currentPhotoFile.absolutePath, opts)
+                    ?.let { ColorExtractor.averageColor(it) }
+            } ?: sunsetTone
+        } else sunsetTone
+    }
+    val wallpaperTone = when (uiState.selectedWallpaper) {
+        "wallpaper_aurora" -> Color(0xFF9DE0D0)
+        "wallpaper_cyber_neon" -> Color(0xFFC4A8FF)
+        "wallpaper_google_photos" -> photoTone
+        else -> sunsetTone
+    }
+    val animatedWallpaperTone by animateColorAsState(wallpaperTone, tween(800), label = "wallpaperTone")
+    // Empty slot / "All apps" have no meaningful app colour, so they follow the wallpaper alone.
+    val appTone = if (isAllAppsFocused || activeApp == null) animatedWallpaperTone else ambientGlow
+    val glassPalette = glassPalette(animatedWallpaperTone, appTone)
+
+    CompositionLocalProvider(LocalGlassPalette provides glassPalette) {
+    // Blur (rather than black out) the screen behind dialogs. No-op below API 31.
+    val backdropBlur by animateDpAsState(
+        targetValue = if (isAnyDialogOpen) DialogBackdropBlur else 0.dp,
+        animationSpec = tween(250),
+        label = "backdropBlur"
+    )
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .then(if (backdropBlur > 0.dp) Modifier.blur(backdropBlur) else Modifier)
             .background(Color(0xFF060810)) // Pure deep OLED black base
     ) {
-        // 1. Wallpaper Subtle Texture (Supports Google Photos album & presets)
-        if (uiState.selectedWallpaper == "wallpaper_google_photos") {
-            val currentPhoto = uiState.googlePhotos.getOrNull(uiState.currentGooglePhotoIndex)
-                ?: uiState.googlePhotos.firstOrNull()
-
-            Crossfade(
-                targetState = currentPhoto,
-                animationSpec = tween(1200),
-                label = "googlePhotosCrossfade"
-            ) { photoFile ->
-                if (photoFile != null && photoFile.exists()) {
-                    val (imgWidth, imgHeight) = remember(photoFile.absolutePath) {
-                        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, options)
-                        options.outWidth to options.outHeight
-                    }
-                    val aspectRatio = if (imgHeight > 0) imgWidth.toFloat() / imgHeight.toFloat() else 1.77f
-                    val isWidescreen = aspectRatio >= 1.60f
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (!isWidescreen) {
-                            // 1. Ambient blurred backdrop: fills widescreen TV sides seamlessly with matching colors
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(photoFile)
-                                    .build(),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .blur(32.dp),
-                                contentScale = ContentScale.Crop,
-                                alpha = 0.50f
-                            )
-                            // 2. Crisp foreground photo: full image at true aspect ratio, never cropped, high-quality filtering
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(photoFile)
-                                    .build(),
-                                contentDescription = "Hình nền Google Photos",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
-                                filterQuality = FilterQuality.High,
-                                alpha = 1.0f
-                            )
-                        } else {
-                            // Widescreen photo fills entire screen with high-quality filter
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(photoFile)
-                                    .build(),
-                                contentDescription = "Hình nền Google Photos",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                filterQuality = FilterQuality.High,
-                                alpha = 1.0f
-                            )
-                        }
-                    }
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.wallpaper_sunset),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        alpha = 0.55f
-                    )
-                }
-            }
-        } else {
-            Image(
-                painter = painterResource(id = wallpaperRes),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                alpha = 0.55f
-            )
-        }
-
-        // 2. Dynamic Ambient Aura (Only for built-in abstract wallpapers, NOT for personal Google Photos!)
-        if (uiState.selectedWallpaper != "wallpaper_google_photos") {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                ambientGlow.copy(alpha = 0.38f),
-                                Color.Transparent
-                            ),
-                            radius = 1400f
-                        )
-                    )
-            )
-        }
-
-        // 3. Ambient Top & Bottom Scrim (Film-grade vignette for crystal-clear readability)
-        val vignetteBrush = if (uiState.selectedWallpaper == "wallpaper_google_photos") {
-            Brush.verticalGradient(
-                0.0f to Color.Black.copy(alpha = 0.72f),
-                0.12f to Color.Black.copy(alpha = 0.45f),
-                0.26f to Color.Transparent,
-                0.68f to Color.Transparent,
-                1.0f to Color.Black.copy(alpha = 0.70f)
-            )
-        } else {
-            Brush.verticalGradient(
-                0.0f to Color.Black.copy(alpha = 0.65f),
-                0.14f to Color.Black.copy(alpha = 0.35f),
-                0.28f to Color.Transparent,
-                0.68f to Color.Transparent,
-                1.0f to Color.Black.copy(alpha = 0.75f)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(vignetteBrush)
-        )
+        WallpaperBackdrop(uiState = uiState, wallpaperRes = wallpaperRes, ambientGlow = ambientGlow)
 
         if (uiState.isLoading) {
             Box(
@@ -271,222 +232,73 @@ fun MainScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 56.dp),
+                        .padding(horizontal = 48.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    if (isAllAppsFocused) {
-                        Column {
-                            // Badge
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Accent.copy(alpha = 0.28f))
-                                    .border(1.dp, Accent.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = "KHO ỨNG DỤNG • HỆ THỐNG",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Large Cinematic Title
-                            Text(
-                                text = "Tất cả ứng dụng",
-                                style = TextStyle(
-                                    fontSize = 42.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    letterSpacing = 0.5.sp,
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.85f),
-                                        offset = Offset(0f, 3f),
-                                        blurRadius = 10f
-                                    )
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Quick Remote Hints
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(5.dp))
-                                        .background(Color.White.copy(alpha = 0.18f))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "OK",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                                Text(
-                                    text = "Mở toàn bộ ${uiState.allApps.size} ứng dụng",
-                                    fontSize = 12.sp,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-                    } else {
-                        val currentApp = activeApp ?: uiState.dockApps.firstOrNull()
-                        if (currentApp != null) {
-                        Column {
-                            // Badges
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(ambientGlow.copy(alpha = 0.28f))
-                                        .border(1.dp, ambientGlow.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = if (currentApp.isTvApp) "ỨNG DỤNG TV" else "ỨNG DỤNG DI ĐỘNG",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        letterSpacing = 0.5.sp
-                                    )
-                                }
-
-                                if (currentApp.isFavorite) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x33FBBF24))
-                                            .border(1.dp, Color(0x66FBBF24), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
-                                        Text(
-                                            text = "★ YÊU THÍCH",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFFBBF24)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Large Cinematic Title with high-contrast shadow
-                            Text(
-                                text = currentApp.label,
-                                style = TextStyle(
-                                    fontSize = 42.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    letterSpacing = 0.5.sp,
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.85f),
-                                        offset = Offset(0f, 3f),
-                                        blurRadius = 10f
-                                    )
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Quick Remote Hints
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(Color.White.copy(alpha = 0.18f))
-                                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "OK",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                    Text(
-                                        text = "Mở",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(Color.White.copy(alpha = 0.18f))
-                                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "Giữ OK",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                    Text(
-                                        text = "Đổi vị trí",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                            }
-                        }
+                    // Re-resolve from state so changes such as toggling a favourite show immediately.
+                    val focusedApp = activeApp?.let { focused ->
+                        uiState.dockApps.firstOrNull { it?.packageName == focused.packageName } ?: focused
                     }
+                    val heroContent = when {
+                        isAllAppsFocused -> HeroContent.AllApps(uiState.allApps.size)
+                        focusedApp != null -> HeroContent.App(focusedApp)
+                        else -> HeroContent.EmptySlot
+                    }
+                    HeroSection(content = heroContent)
                 }
-            }
 
                 // Bottom: Floating Glass Shelf Dock (8 Apps)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 32.dp, vertical = 20.dp),
+                        .padding(horizontal = 32.dp, vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Floating Frosted Glass Capsule Behind Cards
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.Black.copy(alpha = 0.40f)
+                    // Floating Frosted Glass Capsule Behind Cards.
+                    // The glass is a sibling layer (not a clip on the row) so focused cards can
+                    // scale up and cast their glow beyond the capsule edge without being cut off.
+                    var capsuleTopLeft by remember { mutableStateOf(Offset.Zero) }
+                    val screen = LocalConfiguration.current
+                    val capsuleShape = RoundedCornerShape(24.dp)
+                    Box(modifier = Modifier.onGloballyPositioned { capsuleTopLeft = it.positionInRoot() }) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(capsuleShape)
+                        ) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                // Backdrop blur: Compose has no "blur what is behind me", so draw
+                                // the wallpaper again at full-screen size, shifted so it lines up
+                                // with the real one, and blur that copy inside the capsule.
+                                Box(
+                                    modifier = Modifier
+                                        .wrapContentSize(Alignment.TopStart, unbounded = true)
+                                        .requiredSize(screen.screenWidthDp.dp, screen.screenHeightDp.dp)
+                                        .offset {
+                                            IntOffset(-capsuleTopLeft.x.roundToInt(), -capsuleTopLeft.y.roundToInt())
+                                        }
+                                        .blur(DockBackdropBlur)
+                                ) {
+                                    WallpaperBackdrop(
+                                        uiState = uiState,
+                                        wallpaperRes = wallpaperRes,
+                                        ambientGlow = ambientGlow
                                     )
-                                )
+                                }
+                            } else {
+                                // No blur below API 31: darken instead so labels stay readable.
+                                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+                            }
+                            Box(Modifier.matchParentSize().background(glassIdleColor()))
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .border(1.2.dp, Color.White.copy(alpha = 0.12f), capsuleShape)
                             )
-                            .border(
-                                width = 1.2.dp,
-                                color = Color.White.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(28.dp)
-                            )
-                            .padding(horizontal = 18.dp, vertical = 12.dp)
-                    ) {
+                        }
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             uiState.dockApps.forEachIndexed { index, app ->
@@ -494,6 +306,7 @@ fun MainScreen(
                                     slotIndex = index,
                                     app = app,
                                     onFocusGain = { focusedApp, color ->
+                                        lastDockFocusIndex = index
                                         isAllAppsFocused = false
                                         activeApp = focusedApp
                                         activeColor = color
@@ -516,13 +329,14 @@ fun MainScreen(
                                         .focusProperties {
                                             up = settingsFocusRequester
                                         }
-                                        .then(if (index == 0) Modifier.focusRequester(dockFocusRequester) else Modifier)
+                                        .focusRequester(dockRequesters[index])
                                 )
                             }
 
                             // 8th Permanent Slot: "Tất cả" (All Apps) Shortcut
                             AllAppsDockCard(
                                 onFocusGain = { color ->
+                                    lastDockFocusIndex = uiState.dockApps.size
                                     isAllAppsFocused = true
                                     activeApp = null
                                     activeColor = color
@@ -530,9 +344,11 @@ fun MainScreen(
                                 onClick = {
                                     viewModel.openAllAppsDialog()
                                 },
-                                modifier = Modifier.focusProperties {
-                                    up = settingsFocusRequester
-                                }
+                                modifier = Modifier
+                                    .focusProperties {
+                                        up = settingsFocusRequester
+                                    }
+                                    .focusRequester(dockRequesters[uiState.dockApps.size])
                             )
                         }
                     }
@@ -541,23 +357,6 @@ fun MainScreen(
         }
 
         // --- Dialogs ---
-
-        // App Context Menu Dialog
-        uiState.selectedAppForMenu?.let { app ->
-            AppContextMenuDialog(
-                app = app,
-                slotIndex = uiState.selectedSlotForMenu,
-                onDismiss = { viewModel.hideAppMenu() },
-                onChangeSlotApp = {
-                    uiState.selectedSlotForMenu?.let { slot ->
-                        viewModel.openSlotPicker(slot)
-                    }
-                },
-                onToggleFavorite = { viewModel.toggleFavorite(app) },
-                onOpenInfo = { viewModel.openAppSettings(app) },
-                onUninstall = { viewModel.uninstallApp(app) }
-            )
-        }
 
         // Settings Dialog
         if (uiState.isSettingsOpen) {
@@ -621,8 +420,27 @@ fun MainScreen(
                     viewModel.closeAllAppsDialog()
                     viewModel.launchApp(app)
                 },
+                onShowAppMenu = { app -> viewModel.showAppMenu(app) },
                 onDismiss = { viewModel.closeAllAppsDialog() }
             )
         }
+
+        // App Context Menu Dialog — last so it stacks above every other dialog (e.g. All Apps)
+        uiState.selectedAppForMenu?.let { app ->
+            AppContextMenuDialog(
+                app = app,
+                slotIndex = uiState.selectedSlotForMenu,
+                onDismiss = { viewModel.hideAppMenu() },
+                onChangeSlotApp = {
+                    uiState.selectedSlotForMenu?.let { slot ->
+                        viewModel.openSlotPicker(slot)
+                    }
+                },
+                onToggleFavorite = { viewModel.toggleFavorite(app) },
+                onOpenInfo = { viewModel.openAppSettings(app) },
+                onUninstall = { viewModel.uninstallApp(app) }
+            )
+        }
+    }
     }
 }

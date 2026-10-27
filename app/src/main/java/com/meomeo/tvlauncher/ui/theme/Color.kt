@@ -13,3 +13,7 @@ val TextPrimary = Color(0xFFF8FAFC)
 val TextSecondary = Color(0xFF94A3B8)
 val StarYellow = Color(0xFFFBBF24)
 
+
+// Glass surfaces: white at 15% when idle, white at 50% when focused/selected.
+val GlassIdle = Color.White.copy(alpha = 0.15f)
+val GlassFocused = Color.White.copy(alpha = 0.50f)

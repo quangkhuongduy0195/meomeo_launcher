@@ -1,5 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.QuicksandFamily
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -92,6 +94,7 @@ fun TopHeader(
             Text(
                 text = currentTime,
                 style = TextStyle(
+                    fontFamily = QuicksandFamily,
                     fontSize = 44.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -117,6 +120,7 @@ fun TopHeader(
                 Text(
                     text = currentDate,
                     style = TextStyle(
+                        fontFamily = QuicksandFamily,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
@@ -130,9 +134,10 @@ fun TopHeader(
                 Text(
                     text = "MeoMeo TV",
                     style = TextStyle(
+                        fontFamily = QuicksandFamily,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = AccentGlow,
+                        color = Color.White.copy(alpha = 0.75f),
                         shadow = Shadow(
                             color = Color.Black.copy(alpha = 0.85f),
                             offset = Offset(0f, 2f),
@@ -181,14 +186,8 @@ fun HeaderIconButton(
         targetValue = if (isFocused) 1.15f else 1.0f,
         label = "headerButtonScale"
     )
-    val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Accent else Color.Black.copy(alpha = 0.45f),
-        label = "headerButtonBg"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) AccentGlow else Color.White.copy(alpha = 0.22f),
-        label = "headerButtonBorder"
-    )
+    val bgColor = glassFill(isFocused)
+
     val iconColor by animateColorAsState(
         targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.92f),
         label = "headerButtonIcon"
@@ -200,11 +199,7 @@ fun HeaderIconButton(
             .size(46.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(bgColor)
-            .border(
-                width = if (isFocused) 2.dp else 1.2.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(14.dp)
-            )
+
             .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { keyEvent ->
                 if ((keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||

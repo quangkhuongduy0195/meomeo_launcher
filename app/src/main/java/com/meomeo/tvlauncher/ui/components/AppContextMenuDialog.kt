@@ -1,5 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.DialogDim
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.rounded.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,6 +52,7 @@ import com.meomeo.tvlauncher.ui.theme.BgCard
 import com.meomeo.tvlauncher.ui.theme.StarYellow
 import com.meomeo.tvlauncher.ui.theme.TextPrimary
 import com.meomeo.tvlauncher.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 
 @Composable
 fun AppContextMenuDialog(
@@ -58,12 +64,23 @@ fun AppContextMenuDialog(
     onOpenInfo: () -> Unit,
     onUninstall: () -> Unit
 ) {
+    // Land focus on the first option right away so the remote works without an extra D-pad press.
+    val firstItemFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(100)
+        try {
+            firstItemFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+    val hasChangeSlotOption = slotIndex != null && onChangeSlotApp != null
+
     Dialog(onDismissRequest = onDismiss) {
+        DialogDim()
         Box(
             modifier = Modifier
                 .width(380.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(BgCard)
+                .background(glassIdleColor())
                 .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
                 .padding(24.dp)
         ) {
@@ -86,8 +103,9 @@ fun AppContextMenuDialog(
                 // Option: Change Dock App (if from dock)
                 if (slotIndex != null && onChangeSlotApp != null) {
                     MenuDialogItem(
+                        modifier = Modifier.focusRequester(firstItemFocusRequester),
                         icon = Icons.Rounded.Edit,
-                        iconTint = AccentGlow,
+                        iconTint = Color.White,
                         text = "Đổi ứng dụng ở vị trí ${slotIndex + 1}",
                         onClick = {
                             onChangeSlotApp()
@@ -105,7 +123,8 @@ fun AppContextMenuDialog(
                     onClick = {
                         onToggleFavorite()
                         onDismiss()
-                    }
+                    },
+                    modifier = if (hasChangeSlotOption) Modifier else Modifier.focusRequester(firstItemFocusRequester)
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -113,7 +132,7 @@ fun AppContextMenuDialog(
                 // Option 2: App Info
                 MenuDialogItem(
                     icon = Icons.Rounded.Info,
-                    iconTint = AccentGlow,
+                    iconTint = Color.White,
                     text = "Thông tin ứng dụng (Cài đặt)",
                     onClick = {
                         onOpenInfo()

@@ -1,5 +1,9 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.DialogDim
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
+import androidx.compose.ui.zIndex
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -106,11 +110,12 @@ fun WallpaperPickerDialog(
             dismissOnClickOutside = false
         )
     ) {
+        DialogDim()
         Box(
             modifier = Modifier
                 .width(860.dp)
                 .clip(RoundedCornerShape(28.dp))
-                .background(BgCard)
+                .background(glassIdleColor())
                 .border(1.2.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
                 .padding(28.dp)
         ) {
@@ -163,7 +168,7 @@ fun WallpaperPickerDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.10f))
+                            .background(glassIdleColor())
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                             .clickable(onClick = onSyncGooglePhotos)
                             .padding(horizontal = 14.dp, vertical = 8.dp)
@@ -175,14 +180,14 @@ fun WallpaperPickerDialog(
                             if (isGooglePhotosSyncing) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
-                                    color = AccentGlow,
+                                    color = Color.White,
                                     strokeWidth = 2.dp
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Rounded.Sync,
                                     contentDescription = "Đồng bộ",
-                                    tint = AccentGlow,
+                                    tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -236,10 +241,7 @@ fun WallpaperPickerCard(
         label = "wpScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) AccentGlow else if (isSelected) Accent else Color.White.copy(alpha = 0.10f),
-        label = "wpBorder"
-    )
+
 
     Column(
         modifier = modifier
@@ -259,12 +261,17 @@ fun WallpaperPickerCard(
                 .height(115.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Color(0xFF131826))
-                .border(
-                    width = if (isFocused) 3.dp else if (isSelected) 2.dp else 1.dp,
-                    color = borderColor,
-                    shape = RoundedCornerShape(18.dp)
-                )
         ) {
+            // Focus feedback (no border): a 30% white wash over the preview.
+            if (isFocused) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(1f)
+                        .background(glassFocusedColor())
+                )
+            }
+
             if (option.isGooglePhotos) {
                 val previewFile = googlePhotos.firstOrNull()
                 if (previewFile != null && previewFile.exists()) {
@@ -325,7 +332,7 @@ fun WallpaperPickerCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .size(24.dp)
-                        .background(Accent, RoundedCornerShape(12.dp)),
+                        .background(glassFocusedColor(), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

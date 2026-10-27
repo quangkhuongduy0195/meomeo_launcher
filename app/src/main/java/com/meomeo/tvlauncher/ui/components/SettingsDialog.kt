@@ -1,5 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.DialogDim
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,11 +84,12 @@ fun SettingsDialog(
             dismissOnClickOutside = false
         )
     ) {
+        DialogDim()
         Box(
             modifier = Modifier
                 .width(460.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(BgCard)
+                .background(glassIdleColor())
                 .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
                 .padding(26.dp)
         ) {
@@ -98,7 +101,7 @@ fun SettingsDialog(
                     Icon(
                         imageVector = Icons.Rounded.Settings,
                         contentDescription = null,
-                        tint = AccentGlow,
+                        tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                     Text(
@@ -114,7 +117,7 @@ fun SettingsDialog(
                 // Customize 7 Dock Apps
                 MenuDialogItem(
                     icon = Icons.Rounded.Apps,
-                    iconTint = AccentGlow,
+                    iconTint = Color.White,
                     text = "Tùy chỉnh 7 ứng dụng thanh đáy",
                     onClick = {
                         onOpenDockCustomizer()
@@ -162,7 +165,7 @@ fun SettingsDialog(
                 // System Settings
                 MenuDialogItem(
                     icon = Icons.Rounded.Settings,
-                    iconTint = AccentGlow,
+                    iconTint = Color.White,
                     text = "Mở Cài đặt Android TV",
                     onClick = {
                         onOpenAndroidSettings()
@@ -175,7 +178,7 @@ fun SettingsDialog(
                 // Wifi Settings
                 MenuDialogItem(
                     icon = Icons.Rounded.Wifi,
-                    iconTint = AccentGlow,
+                    iconTint = Color.White,
                     text = "Mở Cài đặt Wi-Fi",
                     onClick = {
                         onOpenWifiSettings()

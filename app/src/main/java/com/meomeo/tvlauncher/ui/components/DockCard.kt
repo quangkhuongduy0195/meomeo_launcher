@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -82,7 +83,7 @@ fun DockCard(
     }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.20f else 1.0f,
+        targetValue = if (isFocused) 1.15f else 1.0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -90,23 +91,13 @@ fun DockCard(
         label = "dockCardScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.10f),
-        animationSpec = tween(250),
-        label = "dockCardBorder"
-    )
 
-    val glowColor by animateColorAsState(
-        targetValue = if (isFocused) dominantColor.copy(alpha = 0.75f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "dockCardGlow"
-    )
 
-    val cardShape = RoundedCornerShape(22.dp)
+    val cardShape = RoundedCornerShape(18.dp)
 
     Column(
         modifier = modifier
-            .width(96.dp)
+            .width(80.dp)
             .scale(scale)
             .zIndex(if (isFocused) 20f else 1f)
             .onFocusChanged { focusState ->
@@ -137,36 +128,10 @@ fun DockCard(
         // Floating Card with dynamic glow halo
         Box(
             modifier = Modifier
-                .size(80.dp)
-                .shadow(
-                    elevation = if (isFocused) 24.dp else 4.dp,
-                    shape = cardShape,
-                    ambientColor = glowColor,
-                    spotColor = glowColor
-                )
+                .size(64.dp)
                 .clip(cardShape)
-                .background(
-                    if (isFocused) {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.30f),
-                                Color(0xDD1B2234)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.12f),
-                                Color(0xB30F131F)
-                            )
-                        )
-                    }
-                )
-                .border(
-                    width = if (isFocused) 3.dp else 1.2.dp,
-                    color = borderColor,
-                    shape = cardShape
-                ),
+                .background(glassFill(isFocused))
+,
             contentAlignment = Alignment.Center
         ) {
             if (app != null && iconBitmap != null) {
@@ -175,8 +140,8 @@ fun DockCard(
                     bitmap = iconBitmap.asImageBitmap(),
                     contentDescription = app.label,
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(11.dp)),
                     contentScale = ContentScale.Fit
                 )
 
@@ -205,13 +170,13 @@ fun DockCard(
                         imageVector = Icons.Rounded.Add,
                         contentDescription = "Gán app",
                         tint = if (isFocused) Color.White else TextSecondary,
-                        modifier = Modifier.size(30.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // App Title below
         Text(
@@ -239,7 +204,7 @@ fun AllAppsDockCard(
     var isFocused by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.20f else 1.0f,
+        targetValue = if (isFocused) 1.15f else 1.0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -247,23 +212,13 @@ fun AllAppsDockCard(
         label = "allAppsCardScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.12f),
-        animationSpec = tween(250),
-        label = "allAppsCardBorder"
-    )
 
-    val glowColor by animateColorAsState(
-        targetValue = if (isFocused) AccentGlow.copy(alpha = 0.85f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "allAppsCardGlow"
-    )
 
-    val cardShape = RoundedCornerShape(22.dp)
+    val cardShape = RoundedCornerShape(18.dp)
 
     Column(
         modifier = modifier
-            .width(96.dp)
+            .width(80.dp)
             .scale(scale)
             .zIndex(if (isFocused) 20f else 1f)
             .onFocusChanged { focusState ->
@@ -294,47 +249,21 @@ fun AllAppsDockCard(
         // Floating Card with dynamic glow halo
         Box(
             modifier = Modifier
-                .size(80.dp)
-                .shadow(
-                    elevation = if (isFocused) 26.dp else 4.dp,
-                    shape = cardShape,
-                    ambientColor = glowColor,
-                    spotColor = glowColor
-                )
+                .size(64.dp)
                 .clip(cardShape)
-                .background(
-                    if (isFocused) {
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Accent,
-                                AccentGlow
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.14f),
-                                Color(0xB3151A29)
-                            )
-                        )
-                    }
-                )
-                .border(
-                    width = if (isFocused) 3.dp else 1.2.dp,
-                    color = borderColor,
-                    shape = cardShape
-                ),
+                .background(glassFill(isFocused))
+,
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.Apps,
                 contentDescription = "Tất cả ứng dụng",
                 tint = if (isFocused) Color.White else Color.White.copy(alpha = 0.95f),
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Label below
         Text(

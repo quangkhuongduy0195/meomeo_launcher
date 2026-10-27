@@ -1,5 +1,10 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.AppIconShape
+import com.meomeo.tvlauncher.ui.theme.DialogScrimAlpha
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -9,7 +14,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +81,7 @@ import kotlinx.coroutines.delay
 fun AllAppsDialog(
     allApps: List<AppInfo>,
     onLaunchApp: (AppInfo) -> Unit,
+    onShowAppMenu: (AppInfo) -> Unit,
     onDismiss: () -> Unit
 ) {
     val firstItemFocusRequester = remember { FocusRequester() }
@@ -97,7 +104,7 @@ fun AllAppsDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f)),
+                .background(Color.Black.copy(alpha = DialogScrimAlpha)),
             contentAlignment = Alignment.Center
         ) {
             // Main Glass Dialogue Card
@@ -106,7 +113,7 @@ fun AllAppsDialog(
                     .fillMaxWidth(0.90f)
                     .fillMaxHeight(0.88f)
                     .clip(RoundedCornerShape(32.dp))
-                    .background(Color(0xFF0C101C))
+                    .background(glassIdleColor())
                     .border(
                         width = 1.5.dp,
                         color = Color.White.copy(alpha = 0.16f),
@@ -130,9 +137,7 @@ fun AllAppsDialog(
                                 .size(52.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(Accent, AccentGlow)
-                                    )
+                                    Brush.linearGradient(colors = listOf(glassFocusedColor(), glassFocusedColor()))
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -158,7 +163,7 @@ fun AllAppsDialog(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(Accent)
+                                        .background(glassFocusedColor())
                                         .padding(horizontal = 10.dp, vertical = 3.dp)
                                 ) {
                                     Text(
@@ -183,32 +188,9 @@ fun AllAppsDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.White.copy(alpha = 0.12f))
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
-                        ) {
-                            Text(
-                                text = "OK để Mở",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
-                        ) {
-                            Text(
-                                text = "Back để Đóng",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = TextSecondary
-                            )
-                        }
+                        RemoteHintChip(text = "OK để Mở", emphasized = true)
+                        RemoteHintChip(text = "Giữ OK: Tùy chọn")
+                        RemoteHintChip(text = "Back để Đóng")
                     }
                 }
 
@@ -232,6 +214,7 @@ fun AllAppsDialog(
                         AllAppGridTile(
                             app = app,
                             onClick = { onLaunchApp(app) },
+                            onLongClick = { onShowAppMenu(app) },
                             modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier
                         )
                     }
@@ -242,10 +225,12 @@ fun AllAppsDialog(
 }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AllAppGridTile(
     app: AppInfo,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -267,10 +252,7 @@ fun AllAppGridTile(
         label = "allAppTileScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.08f),
-        label = "allAppTileBorder"
-    )
+
 
     val tileShape = RoundedCornerShape(22.dp)
 
@@ -279,76 +261,42 @@ fun AllAppGridTile(
             .fillMaxWidth()
             .scale(scale)
             .zIndex(if (isFocused) 10f else 1f)
-            .shadow(
-                elevation = if (isFocused) 22.dp else 0.dp,
-                shape = tileShape,
-                ambientColor = dominantColor,
-                spotColor = dominantColor
-            )
             .clip(tileShape)
-            .background(
-                if (isFocused) {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.22f),
-                            dominantColor.copy(alpha = 0.35f),
-                            Color(0xDD151A29)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.06f),
-                            Color(0x66151A29)
-                        )
-                    )
-                }
-            )
-            .border(
-                width = if (isFocused) 2.5.dp else 1.dp,
-                color = borderColor,
-                shape = tileShape
-            )
+            .background(glassFill(isFocused))
+
             .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { keyEvent ->
-                if ((keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER ||
-                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
+                if (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU &&
                     keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP
                 ) {
-                    onClick()
+                    onLongClick()
                     true
                 } else {
                     false
                 }
             }
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onClick
+                onClick = onClick,
+                onLongClick = onLongClick
             )
             .padding(vertical = 14.dp, horizontal = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Icon
+        // App icon: clipped directly (no tile or glow behind it), same as the dock
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .shadow(
-                    elevation = if (isFocused) 12.dp else 4.dp,
-                    shape = RoundedCornerShape(16.dp),
-                    ambientColor = dominantColor,
-                    spotColor = dominantColor
-                )
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black.copy(alpha = 0.25f)),
+                .size(60.dp),
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = app.label,
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(AppIconShape),
                     contentScale = ContentScale.Fit
                 )
             } else {
@@ -385,7 +333,7 @@ fun AllAppGridTile(
         // App Label
         Text(
             text = app.label,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
             color = if (isFocused) Color.White else TextPrimary.copy(alpha = 0.90f),
             maxLines = 1,
@@ -396,3 +344,20 @@ fun AllAppGridTile(
     }
 }
 
+
+@Composable
+private fun RemoteHintChip(text: String, emphasized: Boolean = false) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (emphasized) glassFocusedColor() else glassIdleColor())
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (emphasized) Color.White else TextSecondary
+        )
+    }
+}

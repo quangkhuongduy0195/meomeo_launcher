@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -47,10 +48,7 @@ fun MenuDialogItem(
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
-    val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Accent else Color.White.copy(alpha = 0.05f),
-        label = "menuItemBg"
-    )
+    val bgColor = glassFill(isFocused)
     val textColor by animateColorAsState(
         targetValue = if (isFocused) Color.White else TextPrimary,
         label = "menuItemText"
@@ -61,10 +59,6 @@ fun MenuDialogItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
-            .then(
-                if (isFocused) Modifier.border(2.dp, AccentGlow, RoundedCornerShape(12.dp))
-                else Modifier
-            )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -101,20 +95,13 @@ fun SettingToggleItem(
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
-    val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Accent else Color.White.copy(alpha = 0.05f),
-        label = "toggleItemBg"
-    )
+    val bgColor = glassFill(isFocused)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
-            .then(
-                if (isFocused) Modifier.border(2.dp, AccentGlow, RoundedCornerShape(12.dp))
-                else Modifier
-            )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -133,7 +120,7 @@ fun SettingToggleItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isFocused) Color.White else AccentGlow,
+                tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
             Column {
@@ -156,9 +143,11 @@ fun SettingToggleItem(
             onCheckedChange = { onToggle() },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = AccentGlow,
+                checkedTrackColor = Color.White.copy(alpha = 0.40f),
                 uncheckedThumbColor = TextSecondary,
-                uncheckedTrackColor = Color.White.copy(alpha = 0.1f)
+                uncheckedTrackColor = Color.White.copy(alpha = 0.1f),
+                uncheckedBorderColor = Color.Transparent,
+                checkedBorderColor = Color.Transparent
             )
         )
     }

@@ -79,5 +79,18 @@ object ColorExtractor {
             return fallback
         }
     }
-}
 
+    /** Mean colour of an image; unlike [getDominantColor] this is not biased to the most vibrant pixel. */
+    fun averageColor(bitmap: Bitmap): Color {
+        var r = 0L; var g = 0L; var b = 0L; var n = 0
+        val stepX = (bitmap.width / 16).coerceAtLeast(1)
+        val stepY = (bitmap.height / 16).coerceAtLeast(1)
+        for (x in 0 until bitmap.width step stepX) {
+            for (y in 0 until bitmap.height step stepY) {
+                val px = bitmap.getPixel(x, y)
+                r += (px shr 16) and 0xff; g += (px shr 8) and 0xff; b += px and 0xff; n++
+            }
+        }
+        return if (n == 0) Color.White else Color((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+    }
+}

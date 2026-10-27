@@ -1,5 +1,10 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.AppIconShape
+import com.meomeo.tvlauncher.ui.theme.DialogDim
+import com.meomeo.tvlauncher.ui.theme.glassIdleColor
+import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
+import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -88,19 +93,13 @@ fun AppPickerDialog(
             dismissOnClickOutside = false
         )
     ) {
+        DialogDim()
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.78f)
                 .fillMaxHeight(0.85f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xF8151A29),
-                            Color(0xFC0A0D17)
-                        )
-                    )
-                )
+                .background(glassIdleColor())
                 .border(
                     width = 1.5.dp,
                     color = Color.White.copy(alpha = 0.14f),
@@ -124,9 +123,7 @@ fun AppPickerDialog(
                                 .size(48.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(Accent, AccentGlow)
-                                    )
+                                    Brush.linearGradient(colors = listOf(glassFocusedColor(), glassFocusedColor()))
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -152,7 +149,7 @@ fun AppPickerDialog(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(Accent)
+                                        .background(glassFocusedColor())
                                         .padding(horizontal = 10.dp, vertical = 2.dp)
                                 ) {
                                     Text(
@@ -175,7 +172,7 @@ fun AppPickerDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color.White.copy(alpha = 0.10f))
+                            .background(glassIdleColor())
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
@@ -241,10 +238,7 @@ fun PickerAppTile(
         label = "pickerTileScale"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.08f),
-        label = "pickerTileBorder"
-    )
+
 
     val tileShape = RoundedCornerShape(22.dp)
 
@@ -253,36 +247,9 @@ fun PickerAppTile(
             .fillMaxWidth()
             .scale(scale)
             .zIndex(if (isFocused) 10f else 1f)
-            .shadow(
-                elevation = if (isFocused) 20.dp else 0.dp,
-                shape = tileShape,
-                ambientColor = dominantColor,
-                spotColor = dominantColor
-            )
             .clip(tileShape)
-            .background(
-                if (isFocused) {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.22f),
-                            dominantColor.copy(alpha = 0.35f),
-                            Color(0xDD151A29)
-                        )
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.06f),
-                            Color(0x66151A29)
-                        )
-                    )
-                }
-            )
-            .border(
-                width = if (isFocused) 2.5.dp else 1.dp,
-                color = borderColor,
-                shape = tileShape
-            )
+            .background(glassFill(isFocused))
+
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -292,25 +259,19 @@ fun PickerAppTile(
             .padding(vertical = 14.dp, horizontal = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Floating Squircle Icon with drop shadow (No nested ugly black box)
+        // App icon: clipped directly (no tile or glow behind it), same as the dock
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .shadow(
-                    elevation = if (isFocused) 12.dp else 4.dp,
-                    shape = RoundedCornerShape(18.dp),
-                    ambientColor = dominantColor,
-                    spotColor = dominantColor
-                )
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color.White.copy(alpha = 0.12f)),
+                .size(60.dp),
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = app.label,
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(AppIconShape),
                     contentScale = ContentScale.Fit
                 )
             }
