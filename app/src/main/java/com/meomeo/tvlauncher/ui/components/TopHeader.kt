@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.QuicksandFamily
 import com.meomeo.tvlauncher.ui.theme.glassFill
 import android.view.KeyEvent
@@ -186,8 +187,6 @@ fun HeaderIconButton(
         targetValue = if (isFocused) 1.15f else 1.0f,
         label = "headerButtonScale"
     )
-    val bgColor = glassFill(isFocused)
-
     val iconColor by animateColorAsState(
         targetValue = if (isFocused) Color.White else Color.White.copy(alpha = 0.92f),
         label = "headerButtonIcon"
@@ -197,9 +196,14 @@ fun HeaderIconButton(
         modifier = modifier
             .scale(scale)
             .size(46.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(bgColor)
-
+            .liquidGlass(
+                shape = RoundedCornerShape(14.dp),
+                isFocused = isFocused,
+                blurRadius = 6.dp,
+                lensHeight = 6.dp,
+                lensAmount = 12.dp,
+                withShadow = false
+            )
             .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { keyEvent ->
                 if ((keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||

@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
 
     implementation(libs.coil.compose)
+    implementation(libs.backdrop)
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)

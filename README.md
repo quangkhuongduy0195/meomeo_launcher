@@ -16,6 +16,7 @@ Một launcher tối giản, mượt mà và hiện đại được viết bằn
     - Gỡ cài đặt ứng dụng.
 - **Tùy chọn App di động (Sideload)**:
   - Tích hợp sẵn switch bật/tắt trong phần Cài đặt Launcher để quét và hiển thị cả các ứng dụng Android điện thoại không có Leanback banner chuẩn.
+- **Liquid Glass**: dock, nút header, hộp thoại và bàn phím PIN dùng kính lỏng (làm mờ, khúc xạ ở mép, viền sáng) nhờ thư viện [AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) (`io.github.kyant0:backdrop` 1.0.0, Apache-2.0). Android 13+ có đủ hiệu ứng khúc xạ, Android 12 chỉ làm mờ, Android 11 trở xuống tự chuyển về kính phẳng tối hơn. Thư viện yêu cầu Kotlin 2.2+ và Compose 1.9+ nên project đã được nâng lên Kotlin 2.2.21 và Compose BOM 2025.10.01.
 - **Hẹn giờ xem (khóa của phụ huynh)**:
   - Vào `Cài đặt > Hẹn giờ xem`. Lần đầu bắt buộc tạo mã PIN 4 số; các lần sau phải nhập PIN mới mở được.
   - Chọn thời gian từ 1 đến 60 phút rồi bấm bắt đầu. Hết giờ, một màn hình đen phủ kín và chỉ còn ô nhập PIN cùng bàn phím số (dùng được cả phím số trên remote).

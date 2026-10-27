@@ -1,7 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.AppIconShape
-import com.meomeo.tvlauncher.ui.theme.DialogDim
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
 import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
 import com.meomeo.tvlauncher.ui.theme.glassFill
@@ -122,20 +122,15 @@ fun DockCustomizerDialog(
         } catch (_: Exception) {}
     }
 
-    Dialog(
+    GlassDialog(
         onDismissRequest = {
             if (pickingForSlot != null) {
                 pickingForSlot = null
             } else {
                 onDismiss()
             }
-        },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
+        }
     ) {
-        DialogDim()
         // Intercept back button when inside picker mode inside the Dialog window
         BackHandler(enabled = pickingForSlot != null) {
             pickingForSlot = null
@@ -144,10 +139,8 @@ fun DockCustomizerDialog(
             modifier = Modifier
                 .fillMaxWidth(0.90f) // Spacious Cinema ratio
                 .fillMaxHeight(0.88f)
-                .clip(RoundedCornerShape(32.dp))
-                .background(glassIdleColor())
-                .border(1.5.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(32.dp))
-        ) {
+                .liquidGlass(RoundedCornerShape(32.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
+                ) {
             // Dynamic Ambient Aura in Background
             Box(
                 modifier = Modifier

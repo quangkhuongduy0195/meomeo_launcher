@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.AppIconShape
 import com.meomeo.tvlauncher.ui.theme.DialogScrimAlpha
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
@@ -93,18 +94,9 @@ fun AllAppsDialog(
         } catch (_: Exception) {}
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        // Fullscreen Dimmed Scrim Backdrop
+    GlassDialog(onDismissRequest = onDismiss) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = DialogScrimAlpha)),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             // Main Glass Dialogue Card
@@ -112,14 +104,8 @@ fun AllAppsDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.90f)
                     .fillMaxHeight(0.88f)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(glassIdleColor())
-                    .border(
-                        width = 1.5.dp,
-                        color = Color.White.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(32.dp)
-                    )
-                    .padding(horizontal = 36.dp, vertical = 26.dp)
+                    .liquidGlass(RoundedCornerShape(32.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
+                .padding(horizontal = 36.dp, vertical = 26.dp)
             ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header Row

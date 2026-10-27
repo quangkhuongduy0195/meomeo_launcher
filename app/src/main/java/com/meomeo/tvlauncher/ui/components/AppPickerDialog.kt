@@ -1,7 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.AppIconShape
-import com.meomeo.tvlauncher.ui.theme.DialogDim
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
 import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
 import com.meomeo.tvlauncher.ui.theme.glassFill
@@ -86,25 +86,12 @@ fun AppPickerDialog(
         } catch (_: Exception) {}
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        DialogDim()
+    GlassDialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.78f)
                 .fillMaxHeight(0.85f)
-                .clip(RoundedCornerShape(32.dp))
-                .background(glassIdleColor())
-                .border(
-                    width = 1.5.dp,
-                    color = Color.White.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(32.dp)
-                )
+                .liquidGlass(RoundedCornerShape(32.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
                 .padding(horizontal = 32.dp, vertical = 24.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {

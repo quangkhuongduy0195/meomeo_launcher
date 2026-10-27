@@ -1,5 +1,10 @@
 package com.meomeo.tvlauncher.ui
 
+import com.meomeo.tvlauncher.ui.components.LocalWallpaperContent
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
+import com.meomeo.tvlauncher.ui.theme.LocalGlassBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.focus.onFocusChanged
 import com.meomeo.tvlauncher.ui.components.dockMagnification
 import kotlin.math.abs
@@ -14,7 +19,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import com.meomeo.tvlauncher.ui.theme.DockBackdropBlur
-import com.meomeo.tvlauncher.ui.theme.DialogBackdropBlur
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.produceState
@@ -199,20 +203,30 @@ fun MainScreen(
     val appTone = if (isAllAppsFocused || activeApp == null) animatedWallpaperTone else ambientGlow
     val glassPalette = glassPalette(animatedWallpaperTone, appTone)
 
-    CompositionLocalProvider(LocalGlassPalette provides glassPalette) {
-    // Blur (rather than black out) the screen behind dialogs. No-op below API 31.
-    val backdropBlur by animateDpAsState(
-        targetValue = if (isAnyDialogOpen) DialogBackdropBlur else 0.dp,
-        animationSpec = tween(250),
-        label = "backdropBlur"
-    )
+    // Lets each dialog window paint the wallpaper itself (see GlassDialog).
+    val wallpaperContent: @Composable () -> Unit = {
+        WallpaperBackdrop(uiState = uiState, wallpaperRes = wallpaperRes, ambientGlow = ambientGlow)
+    }
+    val glassBackdrop = rememberLayerBackdrop {
+        drawRect(Color(0xFF060810))
+        drawContent()
+    }
+
+    CompositionLocalProvider(
+        LocalGlassPalette provides glassPalette,
+        LocalGlassBackdrop provides glassBackdrop,
+        LocalWallpaperContent provides wallpaperContent
+    ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(if (backdropBlur > 0.dp) Modifier.blur(backdropBlur) else Modifier)
             .background(Color(0xFF060810)) // Pure deep OLED black base
     ) {
-        WallpaperBackdrop(uiState = uiState, wallpaperRes = wallpaperRes, ambientGlow = ambientGlow)
+        // Only the wallpaper is recorded into the backdrop; the glass surfaces drawn on top of
+        // it (dock, header) refract it. They must stay outside this Box or they would record themselves.
+        Box(modifier = Modifier.fillMaxSize().layerBackdrop(glassBackdrop)) {
+            WallpaperBackdrop(uiState = uiState, wallpaperRes = wallpaperRes, ambientGlow = ambientGlow)
+        }
 
         if (uiState.isLoading) {
             Box(
@@ -264,48 +278,15 @@ fun MainScreen(
                         .padding(horizontal = 32.dp, vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Floating Frosted Glass Capsule Behind Cards.
-                    // The glass is a sibling layer (not a clip on the row) so focused cards can
-                    // scale up and cast their glow beyond the capsule edge without being cut off.
-                    var capsuleTopLeft by remember { mutableStateOf(Offset.Zero) }
-                    val screen = LocalConfiguration.current
-                    val capsuleShape = RoundedCornerShape(24.dp)
-                    Box(modifier = Modifier.onGloballyPositioned { capsuleTopLeft = it.positionInRoot() }) {
+                    // Liquid-glass capsule behind the icons. It is a sibling layer (not a clip on
+                    // the row) so magnified icons can rise above the capsule edge.
+                    val capsuleShape = RoundedCornerShape(26.dp)
+                    Box {
                         Box(
                             modifier = Modifier
                                 .matchParentSize()
-                                .clip(capsuleShape)
-                        ) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                // Backdrop blur: Compose has no "blur what is behind me", so draw
-                                // the wallpaper again at full-screen size, shifted so it lines up
-                                // with the real one, and blur that copy inside the capsule.
-                                Box(
-                                    modifier = Modifier
-                                        .wrapContentSize(Alignment.TopStart, unbounded = true)
-                                        .requiredSize(screen.screenWidthDp.dp, screen.screenHeightDp.dp)
-                                        .offset {
-                                            IntOffset(-capsuleTopLeft.x.roundToInt(), -capsuleTopLeft.y.roundToInt())
-                                        }
-                                        .blur(DockBackdropBlur)
-                                ) {
-                                    WallpaperBackdrop(
-                                        uiState = uiState,
-                                        wallpaperRes = wallpaperRes,
-                                        ambientGlow = ambientGlow
-                                    )
-                                }
-                            } else {
-                                // No blur below API 31: darken instead so labels stay readable.
-                                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
-                            }
-                            Box(Modifier.matchParentSize().background(glassIdleColor()))
-                            Box(
-                                Modifier
-                                    .matchParentSize()
-                                    .border(1.2.dp, Color.White.copy(alpha = 0.12f), capsuleShape)
-                            )
-                        }
+                                .liquidGlass(capsuleShape, blurRadius = 10.dp, lensHeight = 16.dp, lensAmount = 32.dp)
+                        )
                         val focusedDockIndex = if (dockHasFocus) lastDockFocusIndex else -1
                         fun magnificationFor(index: Int): Float =
                             if (focusedDockIndex < 0) 1f else dockMagnification(abs(index - focusedDockIndex))

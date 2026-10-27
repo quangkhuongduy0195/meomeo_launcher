@@ -1,7 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
-import com.meomeo.tvlauncher.ui.theme.DialogDim
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,14 +74,11 @@ fun AppContextMenuDialog(
     }
     val hasChangeSlotOption = slotIndex != null && onChangeSlotApp != null
 
-    Dialog(onDismissRequest = onDismiss) {
-        DialogDim()
+    GlassDialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .width(380.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(glassIdleColor())
-                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                .liquidGlass(RoundedCornerShape(24.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
                 .padding(24.dp)
         ) {
             Column {

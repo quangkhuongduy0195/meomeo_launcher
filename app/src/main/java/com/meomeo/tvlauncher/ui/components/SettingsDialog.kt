@@ -1,7 +1,7 @@
 package com.meomeo.tvlauncher.ui.components
 
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
-import com.meomeo.tvlauncher.ui.theme.DialogDim
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,20 +83,11 @@ fun SettingsDialog(
         } catch (_: Exception) {}
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        DialogDim()
+    GlassDialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .width(460.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(glassIdleColor())
-                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                .liquidGlass(RoundedCornerShape(24.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
                 .heightIn(max = 500.dp)
                 .padding(26.dp)
         ) {

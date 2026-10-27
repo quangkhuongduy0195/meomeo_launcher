@@ -1,5 +1,10 @@
 package com.meomeo.tvlauncher.ui.components
 
+import androidx.compose.runtime.CompositionLocalProvider
+import com.meomeo.tvlauncher.ui.theme.LocalGlassBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -75,7 +80,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.meomeo.tvlauncher.timer.ViewingTimerStore
 import com.meomeo.tvlauncher.ui.PinResult
-import com.meomeo.tvlauncher.ui.theme.DialogDim
 import com.meomeo.tvlauncher.ui.theme.TextPrimary
 import com.meomeo.tvlauncher.ui.theme.TextSecondary
 import com.meomeo.tvlauncher.ui.theme.glassFill
@@ -318,17 +322,11 @@ fun TimerDialogFrame(
     width: Dp = 440.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
-    ) {
-        DialogDim()
+    GlassDialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .width(width)
-                .clip(RoundedCornerShape(28.dp))
-                .background(glassIdleColor())
-                .border(1.2.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
+                .liquidGlass(RoundedCornerShape(28.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
                 .heightIn(max = 500.dp)
                 .verticalScroll(rememberScrollState())
                 .padding(28.dp),
@@ -520,12 +518,22 @@ fun LockScreen(
     // Mostly white (legible on any photo) with a hint of the wallpaper tone, like the macOS clock.
     val clockTint = lerp(Color.White, LocalGlassPalette.current.focused.copy(alpha = 1f), 0.30f).copy(alpha = 0.95f)
 
-    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
-        Box(modifier = Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
-            background()
-            // Light scrim so bright wallpapers do not wash out the clock.
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.12f)))
+    // The wallpaper (blurred while the keypad is up) is the backdrop the keypad panel refracts.
+    val lockBackdrop = rememberLayerBackdrop {
+        drawRect(Color.Black)
+        drawContent()
+    }
 
+    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+        Box(Modifier.fillMaxSize().layerBackdrop(lockBackdrop)) {
+            Box(modifier = Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
+                background()
+                // Light scrim so bright wallpapers do not wash out the clock.
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.12f)))
+            }
+        }
+
+        Box(Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visible = !showPin,
                 enter = fadeIn(tween(250)),
@@ -558,22 +566,22 @@ fun LockScreen(
         }
 
         if (showPin) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(glassIdleColor())
-                    .border(1.2.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
-                    .padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                VerifyPinContent(
-                    title = "Nhập mã PIN",
-                    subtitle = "Để đặt lại hoặc hủy hẹn giờ xem",
-                    lockoutUntil = lockoutUntil,
-                    onVerify = onVerify,
-                    resetKey = resetKey
-                )
+            CompositionLocalProvider(LocalGlassBackdrop provides lockBackdrop) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .liquidGlass(RoundedCornerShape(28.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
+                        .padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    VerifyPinContent(
+                        title = "Nhập mã PIN",
+                        subtitle = "Để đặt lại hoặc hủy hẹn giờ xem",
+                        lockoutUntil = lockoutUntil,
+                        onVerify = onVerify,
+                        resetKey = resetKey
+                    )
+                }
             }
         }
     }

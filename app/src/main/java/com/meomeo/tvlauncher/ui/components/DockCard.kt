@@ -9,7 +9,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -111,7 +110,8 @@ private fun DockSlot(
                     false
                 }
             }
-            .focusable()
+            // combinedClickable is itself the focus target; a separate .focusable() here would
+            // steal focus from it, so OK/Enter would never reach the click handler.
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

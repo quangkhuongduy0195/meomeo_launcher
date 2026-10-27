@@ -1,6 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
-import com.meomeo.tvlauncher.ui.theme.DialogDim
+import com.meomeo.tvlauncher.ui.theme.liquidGlass
 import com.meomeo.tvlauncher.ui.theme.glassIdleColor
 import com.meomeo.tvlauncher.ui.theme.glassFocusedColor
 import androidx.compose.ui.zIndex
@@ -103,20 +103,11 @@ fun WallpaperPickerDialog(
         } catch (_: Exception) {}
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        DialogDim()
+    GlassDialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .width(860.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(glassIdleColor())
-                .border(1.2.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
+                .liquidGlass(RoundedCornerShape(28.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
                 .padding(28.dp)
         ) {
             Column {
