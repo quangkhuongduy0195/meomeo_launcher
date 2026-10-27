@@ -86,3 +86,35 @@ File APK debug đã được tạo tại:
   ```
   Hoặc sử dụng các ứng dụng như **Button Mapper** / **Launch on Boot** để gán phím Home mở MeoMeo Launcher.
 
+---
+
+## 🤖 CI/CD (GitHub Actions)
+
+Workflow: [`.github/workflows/build-release.yml`](.github/workflows/build-release.yml)
+
+- **Pull request vào `main`**: chỉ build kiểm tra và đính kèm APK vào workflow run (tab *Actions*).
+- **Merge / push vào `main`**: build APK release và tự tạo **GitHub Release** `v1.0.<số lần chạy>`, đính kèm file `MeoMeoLauncher-v1.0.N.apk` (tab *Releases*). `versionCode` bằng số lần chạy nên bản sau luôn cập nhật đè được bản trước.
+- Cũng có thể chạy tay ở tab *Actions > Build & Release > Run workflow*.
+
+### Ký APK (nên làm trước khi phát hành thật)
+
+Nếu chưa cấu hình, APK được ký bằng khóa debug do runner tự sinh và **khác nhau ở mỗi lần build**, nên không cài đè lên bản trước được (phải gỡ rồi cài lại). Để các bản release cùng chữ ký:
+
+```bash
+# 1. Tạo keystore (chỉ làm một lần, hãy giữ file này và mật khẩu ở nơi an toàn)
+keytool -genkeypair -v -keystore release.jks -alias meomeo -keyalg RSA -keysize 2048 -validity 10000
+
+# 2. Mã hóa base64 để dán vào secret
+base64 -i release.jks | pbcopy        # macOS
+```
+
+Vào *Settings > Secrets and variables > Actions* của repo và thêm 4 secret:
+
+| Secret | Giá trị |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | nội dung base64 ở bước 2 |
+| `ANDROID_KEYSTORE_PASSWORD` | mật khẩu keystore |
+| `ANDROID_KEY_ALIAS` | `meomeo` (alias đã dùng ở bước 1) |
+| `ANDROID_KEY_PASSWORD` | mật khẩu của khóa |
+
+Lưu ý: nếu workflow cần quyền tạo release, vào *Settings > Actions > General > Workflow permissions* và chọn **Read and write permissions**.

@@ -12,14 +12,30 @@ android {
         applicationId = "com.meomeo.tvlauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI passes these so every GitHub release is installable over the previous one.
+        versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
+    }
+
+    // Release keystore comes from the environment (GitHub Actions secrets). Without it the build
+    // falls back to the debug key, which is fine locally but differs on every CI runner, so such
+    // APKs cannot update one another.
+    val releaseKeystore = System.getenv("KEYSTORE_FILE")
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -38,6 +54,12 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        // This detector crashes on AGP 8.7's lint (it was built for a newer Kotlin analysis API)
+        // and would fail every release build in lintVital. The app does not use LiveData.
+        disable += "NullSafeMutableLiveData"
     }
 }
 
