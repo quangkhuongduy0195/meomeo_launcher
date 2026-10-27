@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +27,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
@@ -66,6 +70,8 @@ fun SettingsDialog(
     onSyncGooglePhotos: () -> Unit = {},
     onOpenAndroidSettings: () -> Unit,
     onOpenWifiSettings: () -> Unit,
+    timerStatus: String? = null,
+    onOpenTimer: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val firstItemFocusRequester = remember { FocusRequester() }
@@ -91,9 +97,10 @@ fun SettingsDialog(
                 .clip(RoundedCornerShape(24.dp))
                 .background(glassIdleColor())
                 .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                .heightIn(max = 500.dp)
                 .padding(26.dp)
         ) {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -147,6 +154,16 @@ fun SettingsDialog(
                     onClick = {
                         onSyncGooglePhotos()
                     }
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Viewing timer (parental passcode required)
+                MenuDialogItem(
+                    icon = Icons.Rounded.Timer,
+                    iconTint = Color.White,
+                    text = if (timerStatus != null) "Hẹn giờ xem • $timerStatus" else "Hẹn giờ xem",
+                    onClick = onOpenTimer
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))

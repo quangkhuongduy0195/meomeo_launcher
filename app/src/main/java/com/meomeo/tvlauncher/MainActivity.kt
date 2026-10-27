@@ -67,11 +67,19 @@ class MainActivity : ComponentActivity() {
         hideSystemUI()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Fired by the viewing-timer alarm: make sure the lock is up and keep re-asserting it.
+        viewModel.reassertLock()
+    }
+
     override fun onResume() {
         super.onResume()
         hideSystemUI()
         // Reload apps in case of changes while in background
         viewModel.loadApps()
+        viewModel.checkTimer()
+        viewModel.refreshOverlayPermission()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

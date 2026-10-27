@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui
 
+import com.meomeo.tvlauncher.ui.components.LockScreen
 import android.os.Build
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
@@ -121,7 +122,11 @@ fun MainScreen(
         uiState.isDockCustomizerOpen ||
         uiState.isWallpaperPickerOpen ||
         uiState.isAllAppsDialogOpen ||
-        uiState.slotPickingFor != null
+        uiState.slotPickingFor != null ||
+        uiState.timerFlow != null
+    // The lock screen is not a dialog (it is opaque, so it must not be blurred), but it also
+    // takes focus away from the dock and has to hand it back when it goes away.
+    val isDockCovered = isAnyDialogOpen || uiState.isLocked
 
     val ambientGlow by animateColorAsState(
         targetValue = activeColor,
@@ -139,8 +144,8 @@ fun MainScreen(
 
     // Dialogs live in their own windows, so closing one leaves the dock without focus.
     // Put it back on the last focused dock item so the next D-pad press behaves as expected.
-    androidx.compose.runtime.LaunchedEffect(isAnyDialogOpen) {
-        if (!isAnyDialogOpen && !uiState.isLoading) {
+    androidx.compose.runtime.LaunchedEffect(isDockCovered) {
+        if (!isDockCovered && !uiState.isLoading) {
             kotlinx.coroutines.delay(150)
             try {
                 dockRequesters[lastDockFocusIndex.coerceIn(0, dockRequesters.lastIndex)].requestFocus()
@@ -214,7 +219,7 @@ fun MainScreen(
                     strokeWidth = 3.dp
                 )
             }
-        } else {
+        } else if (!uiState.isLocked) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
@@ -356,6 +361,18 @@ fun MainScreen(
             }
         }
 
+        // Time is up: opaque lock screen on top of everything else in the window.
+        if (uiState.isLocked) {
+            LockScreen(
+                background = {
+                    WallpaperBackdrop(uiState = uiState, wallpaperRes = wallpaperRes, ambientGlow = ambientGlow)
+                },
+                lockoutUntil = uiState.pinLockoutUntil,
+                onVerify = viewModel::verifyPasscode,
+                resetKey = uiState.timerFlow?.ordinal ?: -1
+            )
+        }
+
         // --- Dialogs ---
 
         // Settings Dialog
@@ -370,6 +387,8 @@ fun MainScreen(
                 onSyncGooglePhotos = { viewModel.syncGooglePhotosNow() },
                 onOpenAndroidSettings = { viewModel.openSystemSettings() },
                 onOpenWifiSettings = { viewModel.openWifiSettings() },
+                timerStatus = timerStatusLabel(uiState.timerEndAt),
+                onOpenTimer = { viewModel.openTimerSettings() },
                 onDismiss = { viewModel.closeSettingsDialog() }
             )
         }
@@ -425,6 +444,9 @@ fun MainScreen(
             )
         }
 
+        // Viewing timer dialogs (PIN entry / setup / timer settings)
+        TimerFlowHost(uiState = uiState, viewModel = viewModel)
+
         // App Context Menu Dialog — last so it stacks above every other dialog (e.g. All Apps)
         uiState.selectedAppForMenu?.let { app ->
             AppContextMenuDialog(
@@ -443,4 +465,11 @@ fun MainScreen(
         }
     }
     }
+}
+
+/** Short status for the Settings entry, e.g. "còn 12 phút"; null when no timer is running. */
+private fun timerStatusLabel(endAt: Long): String? {
+    if (endAt == 0L) return null
+    val msLeft = endAt - System.currentTimeMillis()
+    return if (msLeft <= 0) "đã hết giờ" else "còn ${(msLeft + 59_999) / 60_000} phút"
 }

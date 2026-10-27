@@ -1,11 +1,19 @@
 package com.meomeo.tvlauncher.ui
 
 import android.app.Application
+import android.content.Intent
+import android.media.AudioManager
+import android.net.Uri
+import android.provider.Settings
+import android.view.KeyEvent
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meomeo.tvlauncher.data.AppRepository
 import com.meomeo.tvlauncher.data.GooglePhotosWallpaperManager
 import com.meomeo.tvlauncher.model.AppInfo
+import com.meomeo.tvlauncher.timer.TimerScheduler
+import com.meomeo.tvlauncher.timer.ViewingTimerStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +21,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+
+/** Steps of the viewing-timer UI; at most one is shown at a time. */
+enum class TimerFlow { VERIFY, CREATE_PIN, SETTINGS, CHANGE_PIN }
+
+enum class PinResult { OK, WRONG, LOCKED_OUT }
 
 data class MainUiState(
     val isLoading: Boolean = true,
@@ -31,16 +44,38 @@ data class MainUiState(
     val isDockCustomizerOpen: Boolean = false,
     val isWallpaperPickerOpen: Boolean = false,
     val isAllAppsDialogOpen: Boolean = false,
-    val slotPickingFor: Int? = null // When picker is open to choose app for this slot
+    val slotPickingFor: Int? = null, // When picker is open to choose app for this slot
+
+    // --- Viewing timer ---
+    val hasPasscode: Boolean = false,
+    val timerMinutes: Int = ViewingTimerStore.DEFAULT_MINUTES,
+    /** Wall-clock millis when time runs out; 0 = no timer. */
+    val timerEndAt: Long = 0L,
+    /** Time is up: everything is hidden behind the passcode screen. */
+    val isLocked: Boolean = false,
+    val timerFlow: TimerFlow? = null,
+    /** Passcode was accepted on the lock screen, so the timer panel may be shown (and must offer start/cancel). */
+    val isUnlockedForSettings: Boolean = false,
+    /** Passcode entry is blocked until this wall-clock time after too many wrong attempts. */
+    val pinLockoutUntil: Long = 0L,
+    /** "Display over other apps" granted: required for the lock screen to appear over other apps. */
+    val overlayGranted: Boolean = true
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = AppRepository(application)
     private val googlePhotosManager = GooglePhotosWallpaperManager.getInstance(application)
+    private val timerStore = ViewingTimerStore(application)
+    private var failedPinAttempts = 0
 
     private val _uiState = MutableStateFlow(
         MainUiState(
+            hasPasscode = timerStore.hasPasscode(),
+            timerMinutes = timerStore.minutes,
+            timerEndAt = timerStore.endAt,
+            isLocked = timerStore.isExpired(),
+            overlayGranted = Settings.canDrawOverlays(application),
             includeSideload = repository.isIncludeSideload(),
             selectedWallpaper = repository.getSelectedWallpaper(),
             googlePhotos = googlePhotosManager.getLocalPhotos(),
@@ -58,6 +93,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadApps()
         startGooglePhotosSync()
         startPhotoSlideshow()
+        resumeTimer()
     }
 
     fun syncGooglePhotosNow() {
@@ -228,6 +264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun launchApp(app: AppInfo) {
+        if (_uiState.value.isLocked) return
         repository.launchApp(app)
     }
 
@@ -255,5 +292,169 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openWifiSettings() {
         repository.openWifiSettings()
+    }
+
+    // --- Viewing timer -------------------------------------------------------------------------
+
+    /** Re-arms the alarm after a restart and keeps checking whether time is up. */
+    private fun resumeTimer() {
+        val endAt = timerStore.endAt
+        if (endAt != 0L) {
+            val app = getApplication<Application>()
+            TimerScheduler.schedule(
+                app,
+                if (timerStore.isExpired()) System.currentTimeMillis() + TimerScheduler.RELOCK_INTERVAL_MS else endAt
+            )
+        }
+        viewModelScope.launch {
+            while (true) {
+                checkTimer()
+                delay(1000)
+            }
+        }
+    }
+
+    /** Re-reads the "display over other apps" permission (it is granted on a separate system screen). */
+    fun refreshOverlayPermission() {
+        val granted = Settings.canDrawOverlays(getApplication())
+        _uiState.update { it.copy(overlayGranted = granted) }
+    }
+
+    fun openOverlayPermissionSettings() {
+        val app = getApplication<Application>()
+        try {
+            app.startActivity(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${app.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Exception) {
+            // Many TV builds ship without this settings page.
+            Toast.makeText(
+                app,
+                "Thiết bị không có trang cấp quyền. Cấp bằng ADB: adb shell appops set ${app.packageName} SYSTEM_ALERT_WINDOW allow",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /** Stops whatever another app is playing, so time-up really means time-up. */
+    private fun pauseMedia() {
+        val audio = getApplication<Application>().getSystemService(AudioManager::class.java) ?: return
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE))
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE))
+    }
+
+    /** Locks the launcher as soon as the end time has passed. Also called from onResume. */
+    fun checkTimer() {
+        if (!timerStore.isExpired() || _uiState.value.isLocked) return
+        pauseMedia()
+        TimerScheduler.schedule(
+            getApplication(),
+            System.currentTimeMillis() + TimerScheduler.RELOCK_INTERVAL_MS
+        )
+        _uiState.update {
+            it.copy(
+                isLocked = true,
+                timerFlow = null,
+                isSettingsOpen = false,
+                isDockCustomizerOpen = false,
+                isWallpaperPickerOpen = false,
+                isAllAppsDialogOpen = false,
+                slotPickingFor = null,
+                selectedAppForMenu = null,
+                selectedSlotForMenu = null
+            )
+        }
+    }
+
+    /** Called when the timer alarm brings us to the front: lock now and schedule the next check. */
+    fun reassertLock() {
+        if (!timerStore.isExpired()) return
+        checkTimer()
+        pauseMedia()
+        TimerScheduler.schedule(
+            getApplication(),
+            System.currentTimeMillis() + TimerScheduler.RELOCK_INTERVAL_MS
+        )
+    }
+
+    /** Entry point from Settings: set a passcode first if there is none, otherwise ask for it. */
+    fun openTimerSettings() {
+        _uiState.update {
+            it.copy(
+                isSettingsOpen = false,
+                timerFlow = when {
+                    !timerStore.hasPasscode() -> TimerFlow.CREATE_PIN
+                    it.isUnlockedForSettings -> TimerFlow.SETTINGS
+                    else -> TimerFlow.VERIFY
+                }
+            )
+        }
+    }
+
+    fun closeTimerFlow() {
+        // If we are locked this drops back to the lock screen.
+        _uiState.update { it.copy(timerFlow = null, isUnlockedForSettings = false) }
+    }
+
+    fun verifyPasscode(pin: String): PinResult {
+        val now = System.currentTimeMillis()
+        if (now < _uiState.value.pinLockoutUntil) return PinResult.LOCKED_OUT
+        if (timerStore.verifyPasscode(pin)) {
+            failedPinAttempts = 0
+            _uiState.update { it.copy(timerFlow = TimerFlow.SETTINGS, isUnlockedForSettings = it.isLocked) }
+            return PinResult.OK
+        }
+        failedPinAttempts++
+        if (failedPinAttempts >= MAX_PIN_ATTEMPTS) {
+            failedPinAttempts = 0
+            _uiState.update { it.copy(pinLockoutUntil = now + PIN_LOCKOUT_MS) }
+            return PinResult.LOCKED_OUT
+        }
+        return PinResult.WRONG
+    }
+
+    fun showTimerSettings() {
+        _uiState.update { it.copy(timerFlow = TimerFlow.SETTINGS) }
+    }
+
+    fun startChangePin() {
+        _uiState.update { it.copy(timerFlow = TimerFlow.CHANGE_PIN) }
+    }
+
+    /** Saves a new passcode (first-time setup or change) and continues to the timer panel. */
+    fun savePasscode(pin: String) {
+        timerStore.setPasscode(pin)
+        _uiState.update { it.copy(hasPasscode = true, timerFlow = TimerFlow.SETTINGS) }
+    }
+
+    fun startTimer(minutes: Int) {
+        val m = minutes.coerceIn(ViewingTimerStore.MIN_MINUTES, ViewingTimerStore.MAX_MINUTES)
+        val endAt = System.currentTimeMillis() + m * 60_000L
+        timerStore.minutes = m
+        timerStore.endAt = endAt
+        TimerScheduler.schedule(getApplication(), endAt)
+        _uiState.update {
+            it.copy(
+                timerMinutes = m,
+                timerEndAt = endAt,
+                isLocked = false,
+                isUnlockedForSettings = false,
+                timerFlow = null
+            )
+        }
+    }
+
+    fun cancelTimer() {
+        timerStore.endAt = 0L
+        TimerScheduler.cancel(getApplication())
+        _uiState.update {
+            it.copy(timerEndAt = 0L, isLocked = false, isUnlockedForSettings = false, timerFlow = null)
+        }
+    }
+
+    private companion object {
+        const val MAX_PIN_ATTEMPTS = 5
+        const val PIN_LOCKOUT_MS = 30_000L
     }
 }
