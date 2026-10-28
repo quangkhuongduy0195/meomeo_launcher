@@ -15,7 +15,7 @@ class GooglePhotosWallpaperManager(private val context: Context) {
 
     companion object {
         private const val TAG = "GooglePhotosWallpaper"
-        const val DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/snYDHT7Cc74EvYj4A"
+        const val DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/ewuPzJzqcCq5Ffg48"
         private const val PREFS_NAME = "google_photos_wallpaper_prefs"
         private const val KEY_ALBUM_URL = "album_url"
         private const val KEY_LAST_SYNC_TIME = "last_sync_time"
