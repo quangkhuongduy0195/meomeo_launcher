@@ -43,6 +43,8 @@ data class MainUiState(
     val isSettingsOpen: Boolean = false,
     val isDockCustomizerOpen: Boolean = false,
     val isWallpaperPickerOpen: Boolean = false,
+    /** The wallpaper picker was opened from the home screen, so closing it must not open Settings. */
+    val wallpaperPickerFromHome: Boolean = false,
     val isAllAppsDialogOpen: Boolean = false,
     val slotPickingFor: Int? = null, // When picker is open to choose app for this slot
 
@@ -201,7 +203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun closeSlotPicker() {
-        _uiState.update { it.copy(slotPickingFor = null, isDockCustomizerOpen = true) }
+        _uiState.update { it.copy(slotPickingFor = null) }
     }
 
     fun selectWallpaper(wallpaperId: String) {
@@ -217,12 +219,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isDockCustomizerOpen = false, isSettingsOpen = true, slotPickingFor = null) }
     }
 
-    fun openWallpaperPicker() {
-        _uiState.update { it.copy(isSettingsOpen = false, isDockCustomizerOpen = false, isWallpaperPickerOpen = true, slotPickingFor = null) }
+    fun openWallpaperPicker(fromHome: Boolean = false) {
+        _uiState.update {
+            it.copy(
+                isSettingsOpen = false, isDockCustomizerOpen = false, isWallpaperPickerOpen = true,
+                wallpaperPickerFromHome = fromHome, slotPickingFor = null
+            )
+        }
     }
 
     fun closeWallpaperPicker() {
-        _uiState.update { it.copy(isWallpaperPickerOpen = false, isSettingsOpen = true) }
+        _uiState.update { it.copy(isWallpaperPickerOpen = false, isSettingsOpen = !it.wallpaperPickerFromHome) }
     }
 
     fun openSettingsDialog() {

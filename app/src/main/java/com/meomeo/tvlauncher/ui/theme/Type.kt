@@ -1,14 +1,9 @@
 package com.meomeo.tvlauncher.ui.theme
 
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import com.meomeo.tvlauncher.R
 
-val QuicksandFamily = FontFamily(
-    Font(R.font.quicksand_light, FontWeight.Light),
-    Font(R.font.quicksand_regular, FontWeight.Normal),
-    Font(R.font.quicksand_medium, FontWeight.Medium),
-    Font(R.font.quicksand_semibold, FontWeight.SemiBold),
-    Font(R.font.quicksand_bold, FontWeight.Bold)
-)
+/**
+ * The platform sans-serif (Roboto on most TVs). Apple's SF Pro cannot be bundled outside Apple
+ * platforms, so this is the closest free stand-in.
+ */
+val SystemFont: FontFamily = FontFamily.SansSerif
