@@ -41,7 +41,9 @@ import com.meomeo.tvlauncher.ui.components.LocalBlurredWallpaper
 import com.meomeo.tvlauncher.ui.components.LockScreen
 import com.meomeo.tvlauncher.ui.components.MenuBar
 import com.meomeo.tvlauncher.ui.components.SettingsDialog
+import com.meomeo.tvlauncher.ui.components.UpdateDialog
 import com.meomeo.tvlauncher.ui.components.WallpaperPickerDialog
+import com.meomeo.tvlauncher.ui.components.updateSummary
 import com.meomeo.tvlauncher.ui.components.dockMagnification
 import com.meomeo.tvlauncher.ui.components.nextWallpaperData
 import com.meomeo.tvlauncher.ui.components.rememberBlurredWallpaper
@@ -74,6 +76,7 @@ fun MainScreen(
         uiState.isAllAppsDialogOpen ||
         uiState.slotPickingFor != null ||
         uiState.albumLink != null ||
+        uiState.isUpdateDialogOpen ||
         uiState.timerFlow != null
     // The lock screen is not a dialog, but it also takes focus away from the dock and has to
     // hand it back when it goes away.
@@ -138,6 +141,7 @@ fun MainScreen(
                 onWifi = { viewModel.openWifiSettings() },
                 onTimer = { viewModel.openTimerSettings() },
                 onSettings = { viewModel.openSettingsDialog() },
+                updateAvailable = uiState.update is UpdateState.Available,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
@@ -219,6 +223,9 @@ fun MainScreen(
                 onOpenWifiSettings = { viewModel.openWifiSettings() },
                 timerStatus = timerStatusLabel(uiState.timerEndAt),
                 onOpenTimer = { viewModel.openTimerSettings() },
+                appVersionName = uiState.appVersionName,
+                updateSummary = updateSummary(uiState.update),
+                onOpenUpdate = { viewModel.openUpdateDialog() },
                 onDismiss = { viewModel.closeSettingsDialog() }
             )
         }
@@ -287,6 +294,17 @@ fun MainScreen(
                 isDefaultAlbum = uiState.albumUrl == GooglePhotosWallpaperManager.DEFAULT_ALBUM_URL,
                 onUseDefault = { viewModel.useDefaultAlbum() },
                 onDismiss = { viewModel.closeAlbumLinkDialog() }
+            )
+        }
+
+        // Self-update (GitHub Releases). Above Settings, which opens it.
+        if (uiState.isUpdateDialogOpen) {
+            UpdateDialog(
+                state = uiState.update,
+                currentVersion = uiState.appVersionName,
+                onCheck = { viewModel.checkForUpdate() },
+                onUpdate = { viewModel.startUpdate() },
+                onDismiss = { viewModel.closeUpdateDialog() }
             )
         }
 

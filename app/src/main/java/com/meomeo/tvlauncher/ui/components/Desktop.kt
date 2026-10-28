@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Pets
@@ -71,6 +72,7 @@ import com.meomeo.tvlauncher.ui.MainUiState
 import com.meomeo.tvlauncher.ui.theme.DockRadius
 import com.meomeo.tvlauncher.ui.theme.DockTint
 import com.meomeo.tvlauncher.ui.theme.Label
+import com.meomeo.tvlauncher.ui.theme.MacBlue
 import com.meomeo.tvlauncher.ui.theme.MenuBarTint
 import com.meomeo.tvlauncher.ui.theme.Separator
 import kotlinx.coroutines.delay
@@ -183,7 +185,8 @@ fun MenuBar(
     onWifi: () -> Unit,
     onTimer: () -> Unit,
     onSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    updateAvailable: Boolean = false
 ) {
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
@@ -211,7 +214,7 @@ fun MenuBar(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MenuBarButton(Icons.Rounded.Wifi, "Wi-Fi", onWifi)
                 MenuBarButton(Icons.Rounded.Timer, timerLabel ?: "Hẹn giờ", onTimer, showLabel = timerLabel != null)
-                MenuBarButton(Icons.Rounded.Settings, "Cài đặt", onSettings)
+                MenuBarButton(Icons.Rounded.Settings, "Cài đặt", onSettings, badge = updateAvailable)
                 Text(clock, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Label, modifier = Modifier.padding(start = 10.dp))
             }
         }
@@ -219,7 +222,7 @@ fun MenuBar(
 }
 
 @Composable
-private fun MenuBarButton(icon: ImageVector, label: String, onClick: () -> Unit, showLabel: Boolean = false) {
+private fun MenuBarButton(icon: ImageVector, label: String, onClick: () -> Unit, showLabel: Boolean = false, badge: Boolean = false) {
     FocusSurface(
         onClick = onClick,
         modifier = Modifier.height(26.dp),
@@ -232,7 +235,11 @@ private fun MenuBarButton(icon: ImageVector, label: String, onClick: () -> Unit,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(icon, contentDescription = label, tint = Label, modifier = Modifier.size(17.dp))
+            Box {
+                Icon(icon, contentDescription = label, tint = Label, modifier = Modifier.size(17.dp))
+                // A blue dot says "there is something new in here" without interrupting anyone.
+                if (badge) Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-2).dp).size(8.dp).clip(CircleShape).background(MacBlue))
+            }
             if (showLabel) Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Label, maxLines = 1)
         }
     }

@@ -188,7 +188,7 @@ private fun StatusLine(status: AlbumLinkStatus) {
     }
 }
 
-/** "https://photos.app.goo.gl/snYDHT7Cc74EvYj4A" -> "photos.app.goo.gl/snYDHT7Cc7…" */
+/** "https://photos.app.goo.gl/AbCdEfGh1234567890" -> "photos.app.goo.gl/AbCdEfGh123…" (long links are cut) */
 private fun shorten(url: String): String {
     val bare = url.removePrefix("https://").removePrefix("http://")
     return if (bare.length > 36) bare.take(35) + "…" else bare

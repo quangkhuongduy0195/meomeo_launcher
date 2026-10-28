@@ -16,3 +16,11 @@ local.properties
 app/build
 
 .kotlin
+
+# Release signing keys must never be committed
+*.jks
+*.keystore
+
+# The base64 copy of the signing key used to fill the CI secret
+encoded.txt
+*.base64

@@ -14,6 +14,11 @@ import com.meomeo.tvlauncher.data.AppRepository
 import com.meomeo.tvlauncher.data.GooglePhotosWallpaperManager
 import com.meomeo.tvlauncher.model.AppInfo
 import com.meomeo.tvlauncher.timer.TimerScheduler
+import com.meomeo.tvlauncher.update.ApkInstaller
+import com.meomeo.tvlauncher.update.InstallEvents
+import com.meomeo.tvlauncher.update.InstallOutcome
+import com.meomeo.tvlauncher.update.UpdateChecker
+import com.meomeo.tvlauncher.update.UpdateInfo
 import com.meomeo.tvlauncher.timer.ViewingTimerStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +32,23 @@ import java.io.File
 enum class TimerFlow { VERIFY, CREATE_PIN, SETTINGS, CHANGE_PIN }
 
 enum class PinResult { OK, WRONG, LOCKED_OUT }
+
+/** Where the self-update flow is. */
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data object Checking : UpdateState
+    data object UpToDate : UpdateState
+    data class Available(val info: UpdateInfo) : UpdateState
+    data class Downloading(val info: UpdateInfo, val progress: Float) : UpdateState
+    /** The package installer has the APK; Android may ask the user to confirm. */
+    data class Installing(val info: UpdateInfo) : UpdateState
+    /**
+     * The user has not yet allowed this app to install packages. [settingsOpened] is false on TVs
+     * that have no such settings page, where it has to be granted over ADB.
+     */
+    data class NeedsPermission(val settingsOpened: Boolean) : UpdateState
+    data class Failed(val message: String) : UpdateState
+}
 
 /** Where the "change album from your phone" flow is. */
 sealed interface AlbumLinkStatus {
@@ -62,6 +84,9 @@ data class MainUiState(
     val googlePhotosLastSyncTime: Long = 0L,
     /** The Google Photos album the wallpaper slideshow comes from. */
     val albumUrl: String = "",
+    val update: UpdateState = UpdateState.Idle,
+    val isUpdateDialogOpen: Boolean = false,
+    val appVersionName: String = "",
     /** Non-null while the "change album from your phone" dialog is open. */
     val albumLink: AlbumLinkUi? = null,
     val selectedAppForMenu: AppInfo? = null,
@@ -92,11 +117,17 @@ data class MainUiState(
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
+
     private val repository = AppRepository(application)
     private val googlePhotosManager = GooglePhotosWallpaperManager.getInstance(application)
     private val timerStore = ViewingTimerStore(application)
     private var failedPinAttempts = 0
     private var albumServer: AlbumLinkServer? = null
+    private val updateChecker = UpdateChecker(application)
+    private val apkInstaller = ApkInstaller(application, updateChecker)
+    private val updatePrefs = application.getSharedPreferences("update_prefs", android.content.Context.MODE_PRIVATE)
+    /** The release found by the last check; kept so a failed download can be retried. */
+    private var knownUpdate: UpdateInfo? = null
 
     private val _uiState = MutableStateFlow(
         MainUiState(
@@ -109,7 +140,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             selectedWallpaper = repository.getSelectedWallpaper(),
             googlePhotos = googlePhotosManager.getLocalPhotos(),
             googlePhotosLastSyncTime = googlePhotosManager.getLastSyncTime(),
-            albumUrl = googlePhotosManager.getAlbumUrl()
+            albumUrl = googlePhotosManager.getAlbumUrl(),
+            appVersionName = UpdateChecker.installedVersionName(application)
         )
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -122,6 +154,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         loadApps()
         startGooglePhotosSync()
+        checkForUpdate(auto = true)
+        viewModelScope.launch {
+            InstallEvents.outcome.collect { outcome ->
+                when (outcome) {
+                    is InstallOutcome.Failed -> setUpdate(UpdateState.Failed(outcome.message))
+                    InstallOutcome.Success, null -> Unit
+                }
+                if (outcome != null) InstallEvents.consume()
+            }
+        }
         startPhotoSlideshow()
         resumeTimer()
     }
@@ -142,6 +184,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure {
                 _uiState.update { it.copy(isGooglePhotosSyncing = false) }
             }
+        }
+    }
+
+    // --- Self-update from GitHub Releases ---
+
+    private fun setUpdate(state: UpdateState) {
+        _uiState.update { it.copy(update = state) }
+    }
+
+    fun openUpdateDialog() {
+        _uiState.update { it.copy(isUpdateDialogOpen = true) }
+        val state = _uiState.value.update
+        if (state is UpdateState.Idle || state is UpdateState.Failed) checkForUpdate()
+    }
+
+    fun closeUpdateDialog() {
+        _uiState.update { it.copy(isUpdateDialogOpen = false) }
+    }
+
+    /**
+     * Asks GitHub for a newer release. The automatic check on start-up is throttled to once every
+     * six hours and stays silent when it fails; a manual check always runs and reports errors.
+     */
+    fun checkForUpdate(auto: Boolean = false) {
+        when (_uiState.value.update) {
+            UpdateState.Checking, is UpdateState.Downloading, is UpdateState.Installing -> return
+            else -> Unit
+        }
+        val now = System.currentTimeMillis()
+        if (auto && now - updatePrefs.getLong("last_check", 0L) < UPDATE_CHECK_INTERVAL_MS) return
+        viewModelScope.launch {
+            setUpdate(UpdateState.Checking)
+            updateChecker.checkForUpdate()
+                .onSuccess { info ->
+                    updatePrefs.edit().putLong("last_check", now).apply()
+                    knownUpdate = info
+                    setUpdate(if (info == null) UpdateState.UpToDate else UpdateState.Available(info))
+                }
+                .onFailure { setUpdate(if (auto) UpdateState.Idle else UpdateState.Failed(it.message.orEmpty())) }
+        }
+    }
+
+    /**
+     * Downloads the known update and hands it to the system installer. Also the way out of
+     * [UpdateState.Installing] when the system's confirmation screen went away without an answer.
+     */
+    fun startUpdate() {
+        val info = knownUpdate ?: return
+        if (_uiState.value.update is UpdateState.Downloading) return
+        if (!apkInstaller.canInstall()) {
+            setUpdate(UpdateState.NeedsPermission(settingsOpened = apkInstaller.openInstallPermissionSettings()))
+            return
+        }
+        viewModelScope.launch {
+            setUpdate(UpdateState.Downloading(info, 0f))
+            val apk = apkInstaller.download(info) { progress -> setUpdate(UpdateState.Downloading(info, progress)) }
+                .getOrElse { setUpdate(UpdateState.Failed(it.message.orEmpty())); return@launch }
+            setUpdate(UpdateState.Installing(info))
+            apkInstaller.install(apk).onFailure { setUpdate(UpdateState.Failed(it.message.orEmpty())) }
+            // On success Android takes over: it asks for confirmation and then restarts the app.
         }
     }
 
@@ -571,5 +673,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val MAX_PIN_ATTEMPTS = 5
         const val PIN_LOCKOUT_MS = 30_000L
+        /** How often the automatic update check may hit GitHub. */
+        const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
     }
 }

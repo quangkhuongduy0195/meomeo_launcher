@@ -9,6 +9,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.Wifi
@@ -46,6 +47,9 @@ fun SettingsDialog(
     onOpenWifiSettings: () -> Unit,
     timerStatus: String? = null,
     onOpenTimer: () -> Unit = {},
+    appVersionName: String = "",
+    updateSummary: String? = null,
+    onOpenUpdate: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val firstItemFocusRequester = remember { FocusRequester() }
@@ -113,6 +117,18 @@ fun SettingsDialog(
             )
         }
 
+        SectionLabel("Phần mềm")
+        InsetGroup {
+            MacRow(
+                icon = Icons.Rounded.SystemUpdate,
+                iconColor = MacBlue,
+                title = "Cập nhật",
+                subtitle = updateSummary ?: "Phiên bản v$appVersionName",
+                chevron = true,
+                onClick = onOpenUpdate
+            )
+        }
+
         SectionLabel("Hệ thống")
         InsetGroup {
             MacRow(
@@ -139,7 +155,7 @@ fun SettingsDialog(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "MeoMeo Launcher v1.0.0",
+            text = "MeoMeo Launcher v$appVersionName",
             fontSize = 11.sp,
             color = LabelTertiary,
             modifier = Modifier.fillMaxWidth().padding(top = 2.dp).align(Alignment.CenterHorizontally)
