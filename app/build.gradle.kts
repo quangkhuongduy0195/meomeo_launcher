@@ -80,8 +80,8 @@ dependencies {
     implementation(libs.androidx.tv.material)
 
     implementation(libs.coil.compose)
-    implementation(libs.backdrop)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.zxing.core)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -1,27 +1,9 @@
 package com.meomeo.tvlauncher.ui.components
 
-import com.meomeo.tvlauncher.ui.theme.liquidGlass
-import com.meomeo.tvlauncher.ui.theme.glassIdleColor
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudSync
@@ -30,35 +12,27 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.Wifi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.meomeo.tvlauncher.ui.theme.Accent
-import com.meomeo.tvlauncher.ui.theme.AccentGlow
-import com.meomeo.tvlauncher.ui.theme.BgCard
-import com.meomeo.tvlauncher.ui.theme.TextPrimary
-import com.meomeo.tvlauncher.ui.theme.TextSecondary
+import com.meomeo.tvlauncher.data.AppRepository
+import com.meomeo.tvlauncher.ui.theme.LabelTertiary
+import com.meomeo.tvlauncher.ui.theme.MacBlue
+import com.meomeo.tvlauncher.ui.theme.SystemGray
+import com.meomeo.tvlauncher.ui.theme.SystemGreen
+import com.meomeo.tvlauncher.ui.theme.SystemOrange
+import com.meomeo.tvlauncher.ui.theme.SystemPink
+import com.meomeo.tvlauncher.ui.theme.SystemPurple
+import kotlinx.coroutines.delay
 
+/** "System Settings" for the launcher: grouped rows with coloured icon tiles. */
 @Composable
 fun SettingsDialog(
     includeSideload: Boolean,
@@ -77,132 +51,98 @@ fun SettingsDialog(
     val firstItemFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100)
+        delay(100)
         try {
             firstItemFocusRequester.requestFocus()
         } catch (_: Exception) {}
     }
 
-    GlassDialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .width(460.dp)
-                .liquidGlass(RoundedCornerShape(24.dp), blurRadius = 12.dp, lensHeight = 18.dp, lensAmount = 36.dp)
-                .heightIn(max = 500.dp)
-                .padding(26.dp)
-        ) {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Text(
-                        text = "Cài đặt MeoMeo Launcher",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Customize 7 Dock Apps
-                MenuDialogItem(
-                    icon = Icons.Rounded.Apps,
-                    iconTint = Color.White,
-                    text = "Tùy chỉnh 7 ứng dụng thanh đáy",
-                    onClick = {
-                        onOpenDockCustomizer()
-                    },
-                    modifier = Modifier.focusRequester(firstItemFocusRequester)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Wallpaper selector
-                MenuDialogItem(
-                    icon = Icons.Rounded.Wallpaper,
-                    iconTint = Color(0xFFF43F5E),
-                    text = "Đổi hình nền Google TV",
-                    onClick = {
-                        onOpenWallpaperPicker()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Sync Google Photos immediately
-                MenuDialogItem(
-                    icon = Icons.Rounded.CloudSync,
-                    iconTint = Color(0xFF10B981),
-                    text = if (isGooglePhotosSyncing) "Đang tải ảnh Google Photos..." else if (googlePhotosCount > 0) "Đồng bộ lại Google Photos ($googlePhotosCount ảnh)" else "Đồng bộ Album Google Photos",
-                    onClick = {
-                        onSyncGooglePhotos()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Viewing timer (parental passcode required)
-                MenuDialogItem(
-                    icon = Icons.Rounded.Timer,
-                    iconTint = Color.White,
-                    text = if (timerStatus != null) "Hẹn giờ xem • $timerStatus" else "Hẹn giờ xem",
-                    onClick = onOpenTimer
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Sideload Toggle Item
-                SettingToggleItem(
-                    icon = Icons.Rounded.PhoneAndroid,
-                    title = "Hiện app di động (Sideload)",
-                    subtitle = "Quét thêm các app không có banner TV",
-                    isChecked = includeSideload,
-                    onToggle = onToggleSideload
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // System Settings
-                MenuDialogItem(
-                    icon = Icons.Rounded.Settings,
-                    iconTint = Color.White,
-                    text = "Mở Cài đặt Android TV",
-                    onClick = {
-                        onOpenAndroidSettings()
-                        onDismiss()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Wifi Settings
-                MenuDialogItem(
-                    icon = Icons.Rounded.Wifi,
-                    iconTint = Color.White,
-                    text = "Mở Cài đặt Wi-Fi",
-                    onClick = {
-                        onOpenWifiSettings()
-                        onDismiss()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "MeoMeo Launcher v1.0.0 • Thiết kế tối giản cho Google TV",
-                    fontSize = 11.sp,
-                    color = TextSecondary.copy(alpha = 0.7f),
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
+    MacWindow(onDismiss = onDismiss, title = "Cài đặt", width = 520.dp, maxHeight = 480.dp) {
+        SectionLabel("Giao diện")
+        InsetGroup {
+            MacRow(
+                icon = Icons.Rounded.Apps,
+                iconColor = MacBlue,
+                title = "Dock",
+                subtitle = "Chọn ${AppRepository.DOCK_SLOTS_COUNT} ứng dụng yêu thích",
+                chevron = true,
+                onClick = onOpenDockCustomizer,
+                modifier = Modifier.focusRequester(firstItemFocusRequester)
+            )
+            MacRow(
+                icon = Icons.Rounded.Wallpaper,
+                iconColor = SystemPurple,
+                title = "Hình nền",
+                chevron = true,
+                onClick = onOpenWallpaperPicker
+            )
+            MacRow(
+                icon = Icons.Rounded.CloudSync,
+                iconColor = SystemGreen,
+                title = when {
+                    isGooglePhotosSyncing -> "Đang tải ảnh Google Photos..."
+                    googlePhotosCount > 0 -> "Đồng bộ lại Google Photos"
+                    else -> "Đồng bộ album Google Photos"
+                },
+                subtitle = if (googlePhotosCount > 0) "$googlePhotosCount ảnh" else null,
+                onClick = onSyncGooglePhotos
+            )
         }
+
+        SectionLabel("Gia đình")
+        InsetGroup {
+            MacRow(
+                icon = Icons.Rounded.Timer,
+                iconColor = SystemOrange,
+                title = "Hẹn giờ xem",
+                subtitle = timerStatus,
+                chevron = true,
+                onClick = onOpenTimer
+            )
+        }
+
+        SectionLabel("Ứng dụng")
+        InsetGroup {
+            ToggleRow(
+                icon = Icons.Rounded.PhoneAndroid,
+                iconColor = SystemPink,
+                title = "Hiện app di động",
+                subtitle = "Quét cả app không có banner TV",
+                checked = includeSideload,
+                onToggle = onToggleSideload
+            )
+        }
+
+        SectionLabel("Hệ thống")
+        InsetGroup {
+            MacRow(
+                icon = Icons.Rounded.Settings,
+                iconColor = SystemGray,
+                title = "Cài đặt Android TV",
+                chevron = true,
+                onClick = {
+                    onOpenAndroidSettings()
+                    onDismiss()
+                }
+            )
+            MacRow(
+                icon = Icons.Rounded.Wifi,
+                iconColor = MacBlue,
+                title = "Cài đặt Wi-Fi",
+                chevron = true,
+                onClick = {
+                    onOpenWifiSettings()
+                    onDismiss()
+                }
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "MeoMeo Launcher v1.0.0",
+            fontSize = 11.sp,
+            color = LabelTertiary,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp).align(Alignment.CenterHorizontally)
+        )
     }
 }
