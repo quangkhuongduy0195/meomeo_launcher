@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.meomeo.tvlauncher.data.AlbumLinkServer
 import com.meomeo.tvlauncher.data.AppRepository
 import com.meomeo.tvlauncher.data.GooglePhotosWallpaperManager
 import com.meomeo.tvlauncher.model.AppInfo
@@ -27,6 +28,27 @@ enum class TimerFlow { VERIFY, CREATE_PIN, SETTINGS, CHANGE_PIN }
 
 enum class PinResult { OK, WRONG, LOCKED_OUT }
 
+/** Where the "change album from your phone" flow is. */
+sealed interface AlbumLinkStatus {
+    /** The QR code is up; no link has arrived yet. */
+    data object Waiting : AlbumLinkStatus
+    data object Syncing : AlbumLinkStatus
+    data class Done(val photoCount: Int) : AlbumLinkStatus
+    data class Failed(val message: String) : AlbumLinkStatus
+    /** A phone has opened the page; the TV is now waiting for the link to be sent. */
+    data object PhoneOpened : AlbumLinkStatus
+    /** The TV has no local network address, so a phone cannot reach it. */
+    data object NoNetwork : AlbumLinkStatus
+}
+
+/** State of the open "change album" dialog. [pageUrl] is what the QR code encodes. */
+data class AlbumLinkUi(
+    val pageUrl: String?,
+    val status: AlbumLinkStatus,
+    /** Other addresses to try if [pageUrl] does not open on the phone. */
+    val alternateUrls: List<String> = emptyList()
+)
+
 data class MainUiState(
     val isLoading: Boolean = true,
     val allApps: List<AppInfo> = emptyList(),
@@ -38,6 +60,10 @@ data class MainUiState(
     val currentGooglePhotoIndex: Int = 0,
     val isGooglePhotosSyncing: Boolean = false,
     val googlePhotosLastSyncTime: Long = 0L,
+    /** The Google Photos album the wallpaper slideshow comes from. */
+    val albumUrl: String = "",
+    /** Non-null while the "change album from your phone" dialog is open. */
+    val albumLink: AlbumLinkUi? = null,
     val selectedAppForMenu: AppInfo? = null,
     val selectedSlotForMenu: Int? = null,
     val isSettingsOpen: Boolean = false,
@@ -70,6 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val googlePhotosManager = GooglePhotosWallpaperManager.getInstance(application)
     private val timerStore = ViewingTimerStore(application)
     private var failedPinAttempts = 0
+    private var albumServer: AlbumLinkServer? = null
 
     private val _uiState = MutableStateFlow(
         MainUiState(
@@ -81,7 +108,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             includeSideload = repository.isIncludeSideload(),
             selectedWallpaper = repository.getSelectedWallpaper(),
             googlePhotos = googlePhotosManager.getLocalPhotos(),
-            googlePhotosLastSyncTime = googlePhotosManager.getLastSyncTime()
+            googlePhotosLastSyncTime = googlePhotosManager.getLastSyncTime(),
+            albumUrl = googlePhotosManager.getAlbumUrl()
         )
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -115,6 +143,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(isGooglePhotosSyncing = false) }
             }
         }
+    }
+
+    /**
+     * Opens the "change album" dialog: starts a small web server on the local network so a phone
+     * that scans the QR code can paste the link. It runs only while the dialog is open.
+     */
+    fun openAlbumLinkDialog() {
+        albumServer?.stop()
+        val server = AlbumLinkServer(
+            context = getApplication(),
+            onLink = { link -> viewModelScope.launch { applyAlbumUrl(link) } },
+            // Lets the user tell "the phone cannot reach the TV" from "it reached it, now paste the link".
+            onPageOpened = {
+                _uiState.update {
+                    val status = it.albumLink?.status
+                    if (status == AlbumLinkStatus.Waiting) it.copy(albumLink = it.albumLink.copy(status = AlbumLinkStatus.PhoneOpened)) else it
+                }
+            }
+        )
+        val started = server.start()
+        albumServer = if (started) server else null
+        _uiState.update {
+            it.copy(
+                albumLink = AlbumLinkUi(
+                    pageUrl = server.pageUrl,
+                    status = if (started) AlbumLinkStatus.Waiting else AlbumLinkStatus.NoNetwork,
+                    alternateUrls = server.alternateUrls
+                )
+            )
+        }
+    }
+
+    fun closeAlbumLinkDialog() {
+        albumServer?.stop()
+        albumServer = null
+        _uiState.update { it.copy(albumLink = null) }
+    }
+
+    fun useDefaultAlbum() {
+        viewModelScope.launch { applyAlbumUrl(GooglePhotosWallpaperManager.DEFAULT_ALBUM_URL) }
+    }
+
+    /** Switches the slideshow to [url]. A link that yields no photos is rejected and the old album kept. */
+    private suspend fun applyAlbumUrl(url: String) {
+        val previous = googlePhotosManager.getAlbumUrl()
+        setAlbumStatus(AlbumLinkStatus.Syncing)
+        _uiState.update { it.copy(isGooglePhotosSyncing = true) }
+        googlePhotosManager.setAlbumUrl(url)
+        // No cached fallback: it would quietly keep showing the previous album's photos.
+        val result = googlePhotosManager.syncAlbum(useCachedFallback = false)
+        val files = result.getOrNull().orEmpty()
+        if (files.isNotEmpty()) {
+            repository.setSelectedWallpaper("wallpaper_google_photos")
+            _uiState.update {
+                it.copy(
+                    isGooglePhotosSyncing = false,
+                    googlePhotos = files,
+                    currentGooglePhotoIndex = 0,
+                    selectedWallpaper = "wallpaper_google_photos",
+                    googlePhotosLastSyncTime = googlePhotosManager.getLastSyncTime(),
+                    albumUrl = url,
+                    albumLink = it.albumLink?.copy(status = AlbumLinkStatus.Done(files.size))
+                )
+            }
+        } else {
+            googlePhotosManager.setAlbumUrl(previous)
+            _uiState.update { it.copy(isGooglePhotosSyncing = false) }
+            setAlbumStatus(
+                AlbumLinkStatus.Failed("Không tìm thấy ảnh trong album này. Hãy kiểm tra link và đảm bảo album đã bật chia sẻ.")
+            )
+        }
+    }
+
+    private fun setAlbumStatus(status: AlbumLinkStatus) {
+        _uiState.update { it.copy(albumLink = it.albumLink?.copy(status = status)) }
+    }
+
+    override fun onCleared() {
+        albumServer?.stop()
+        super.onCleared()
     }
 
     private fun startGooglePhotosSync() {

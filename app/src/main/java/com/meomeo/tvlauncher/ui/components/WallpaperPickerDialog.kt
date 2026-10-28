@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -60,9 +62,12 @@ fun WallpaperPickerDialog(
     isGooglePhotosSyncing: Boolean,
     onSyncGooglePhotos: () -> Unit,
     onSelectWallpaper: (String) -> Unit,
+    onChangeAlbum: () -> Unit,
+    albumUrl: String,
     onDismiss: () -> Unit
 ) {
     val firstFocus = remember { FocusRequester() }
+    val buttonsFocus = remember { FocusRequester() }
 
     val options = remember(googlePhotos.size) {
         listOf(
@@ -95,16 +100,35 @@ fun WallpaperPickerDialog(
                     onClick = { onSelectWallpaper(option.id) },
                     modifier = Modifier
                         .weight(1f)
+                        // The buttons are not vertically aligned with every card, so name the target.
+                        .focusProperties { down = buttonsFocus }
                         .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier)
                 )
             }
         }
         Spacer(Modifier.height(18.dp))
-        MacButton(
-            text = if (isGooglePhotosSyncing) "Đang tải ảnh..." else "Đồng bộ album Google Photos",
-            icon = Icons.Rounded.Sync,
-            onClick = onSyncGooglePhotos
+        Text(
+            text = "Album Google Photos: " + albumUrl.removePrefix("https://").take(40),
+            fontSize = 12.sp,
+            color = LabelSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MacButton(
+                text = "Đổi album bằng điện thoại",
+                icon = Icons.Rounded.QrCode2,
+                primary = true,
+                onClick = onChangeAlbum,
+                modifier = Modifier.focusRequester(buttonsFocus)
+            )
+            MacButton(
+                text = if (isGooglePhotosSyncing) "Đang tải ảnh..." else "Đồng bộ lại",
+                icon = Icons.Rounded.Sync,
+                onClick = onSyncGooglePhotos
+            )
+        }
     }
 }
 

@@ -3,6 +3,8 @@ package com.meomeo.tvlauncher.data
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -32,6 +34,9 @@ class GooglePhotosWallpaperManager(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val wallpapersDir = File(context.filesDir, "google_photos_wallpapers").apply { mkdirs() }
 
+    /** The periodic sync and a manual "change album" must never write the same files at once. */
+    private val syncMutex = Mutex()
+
     private val httpClient = OkHttpClient.Builder()
         .followRedirects(true)
         .followSslRedirects(true)
@@ -42,6 +47,8 @@ class GooglePhotosWallpaperManager(private val context: Context) {
     fun getAlbumUrl(): String {
         return prefs.getString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL) ?: DEFAULT_ALBUM_URL
     }
+
+    fun isDefaultAlbum(): Boolean = getAlbumUrl() == DEFAULT_ALBUM_URL
 
     fun setAlbumUrl(url: String) {
         val cleanUrl = url.trim()
@@ -66,7 +73,14 @@ class GooglePhotosWallpaperManager(private val context: Context) {
         }
     }
 
-    suspend fun syncAlbum(): Result<List<File>> = withContext(Dispatchers.IO) {
+    /**
+     * @param useCachedFallback when the album yields no photos, return the photos already on disk
+     * instead of failing. Right for a routine refresh (offline, or Google hiccuped); wrong for a
+     * newly entered link, where it would silently keep showing the previous album.
+     */
+    suspend fun syncAlbum(useCachedFallback: Boolean = true): Result<List<File>> = syncMutex.withLock { syncAlbumLocked(useCachedFallback) }
+
+    private suspend fun syncAlbumLocked(useCachedFallback: Boolean): Result<List<File>> = withContext(Dispatchers.IO) {
         val currentUrl = getAlbumUrl()
         Log.d(TAG, "Starting sync for album: $currentUrl")
 
@@ -96,7 +110,7 @@ class GooglePhotosWallpaperManager(private val context: Context) {
 
             if (matches.isEmpty()) {
                 val fallback = getLocalPhotos()
-                if (fallback.isNotEmpty()) {
+                if (useCachedFallback && fallback.isNotEmpty()) {
                     return@withContext Result.success(fallback)
                 }
                 return@withContext Result.failure(Exception("No photos found in shared album"))
@@ -163,7 +177,7 @@ class GooglePhotosWallpaperManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Google Photos album", e)
             val fallback = getLocalPhotos()
-            if (fallback.isNotEmpty()) {
+            if (useCachedFallback && fallback.isNotEmpty()) {
                 Result.success(fallback)
             } else {
                 Result.failure(e)

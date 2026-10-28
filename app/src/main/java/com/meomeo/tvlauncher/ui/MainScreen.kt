@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.meomeo.tvlauncher.R
 import com.meomeo.tvlauncher.model.AppInfo
+import com.meomeo.tvlauncher.data.GooglePhotosWallpaperManager
+import com.meomeo.tvlauncher.ui.components.AlbumLinkDialog
 import com.meomeo.tvlauncher.ui.components.AllAppsDialog
 import com.meomeo.tvlauncher.ui.components.AppContextMenuDialog
 import com.meomeo.tvlauncher.ui.components.AppPickerDialog
@@ -71,6 +73,7 @@ fun MainScreen(
         uiState.isWallpaperPickerOpen ||
         uiState.isAllAppsDialogOpen ||
         uiState.slotPickingFor != null ||
+        uiState.albumLink != null ||
         uiState.timerFlow != null
     // The lock screen is not a dialog, but it also takes focus away from the dock and has to
     // hand it back when it goes away.
@@ -242,6 +245,8 @@ fun MainScreen(
                 onSelectWallpaper = { wallpaperId ->
                     viewModel.selectWallpaper(wallpaperId)
                 },
+                onChangeAlbum = { viewModel.openAlbumLinkDialog() },
+                albumUrl = uiState.albumUrl,
                 onDismiss = { viewModel.closeWallpaperPicker() }
             )
         }
@@ -273,6 +278,17 @@ fun MainScreen(
 
         // Viewing timer dialogs (PIN entry / setup / timer settings)
         TimerFlowHost(uiState = uiState, viewModel = viewModel)
+
+        // Change the Google Photos album from a phone (QR code). Above the wallpaper picker.
+        uiState.albumLink?.let { link ->
+            AlbumLinkDialog(
+                link = link,
+                currentAlbum = uiState.albumUrl,
+                isDefaultAlbum = uiState.albumUrl == GooglePhotosWallpaperManager.DEFAULT_ALBUM_URL,
+                onUseDefault = { viewModel.useDefaultAlbum() },
+                onDismiss = { viewModel.closeAlbumLinkDialog() }
+            )
+        }
 
         // App Context Menu Dialog — last so it stacks above every other dialog (e.g. All Apps)
         uiState.selectedAppForMenu?.let { app ->
