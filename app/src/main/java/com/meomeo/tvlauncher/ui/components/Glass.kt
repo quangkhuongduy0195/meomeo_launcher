@@ -1,5 +1,6 @@
 package com.meomeo.tvlauncher.ui.components
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.size.Size
+import coil.transform.Transformation
 import com.meomeo.tvlauncher.ui.theme.Hairline
 
 // ---------------------------------------------------------------------------------------------
@@ -53,8 +56,9 @@ import com.meomeo.tvlauncher.ui.theme.Hairline
  */
 val LocalBlurredWallpaper = compositionLocalOf<State<ImageBitmap?>?> { null }
 
-private const val BlurWidth = 96
-private const val BlurHeight = 54
+private const val BlurWidth = 192
+private const val BlurHeight = 108
+private const val BlurRadius = 7
 
 /** macOS materials boost saturation under the blur. */
 private val Saturate = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.5f) })
@@ -67,9 +71,55 @@ fun rememberBlurredWallpaper(data: Any): State<ImageBitmap?> {
         val request = ImageRequest.Builder(context)
             .data(data)
             .size(BlurWidth, BlurHeight)
+            .transformations(SmoothBlur(BlurRadius))
             .allowHardware(false)
             .build()
         context.imageLoader.execute(request).drawable?.toBitmap()?.asImageBitmap()?.let { value = it }
+    }
+}
+
+/**
+ * One-off gaussian-like blur (three box-blur passes) run by Coil off the main thread. Upscaling a
+ * tiny bitmap alone leaves visible blocks; smoothing it first makes the result seamless.
+ */
+private class SmoothBlur(private val radius: Int) : Transformation {
+    override val cacheKey = "smoothBlur-$radius"
+
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val w = input.width
+        val h = input.height
+        var src = IntArray(w * h).also { input.getPixels(it, 0, w, 0, 0, w, h) }
+        var dst = IntArray(w * h)
+        repeat(3) {
+            boxBlur(src, dst, w, h, radius, horizontal = true)
+            boxBlur(dst, src, w, h, radius, horizontal = false)
+        }
+        return Bitmap.createBitmap(src, w, h, Bitmap.Config.ARGB_8888)
+    }
+
+    /** Sliding-window average along one axis, clamping at the edges. */
+    private fun boxBlur(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
+        val lines = if (horizontal) h else w
+        val len = if (horizontal) w else h
+        val step = if (horizontal) 1 else w
+        val window = 2 * r + 1
+        for (line in 0 until lines) {
+            val base = if (horizontal) line * w else line
+            var a = 0; var rr = 0; var g = 0; var b = 0
+            for (i in -r..r) {
+                val c = src[base + i.coerceIn(0, len - 1) * step]
+                a += c ushr 24; rr += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF
+            }
+            for (i in 0 until len) {
+                dst[base + i * step] = ((a / window) shl 24) or ((rr / window) shl 16) or ((g / window) shl 8) or (b / window)
+                val add = src[base + (i + r + 1).coerceAtMost(len - 1) * step]
+                val sub = src[base + (i - r).coerceAtLeast(0) * step]
+                a += (add ushr 24) - (sub ushr 24)
+                rr += ((add shr 16) and 0xFF) - ((sub shr 16) and 0xFF)
+                g += ((add shr 8) and 0xFF) - ((sub shr 8) and 0xFF)
+                b += (add and 0xFF) - (sub and 0xFF)
+            }
+        }
     }
 }
 
@@ -83,7 +133,7 @@ fun BlurredFill(modifier: Modifier = Modifier.fillMaxSize()) {
             contentDescription = null,
             modifier = modifier,
             contentScale = ContentScale.Crop,
-            filterQuality = FilterQuality.Medium,
+            filterQuality = FilterQuality.High,
             colorFilter = Saturate
         )
     } else {
@@ -130,7 +180,7 @@ fun FrostedBox(
                         }
                     },
                     contentScale = ContentScale.Crop,
-                    filterQuality = FilterQuality.Medium,
+                    filterQuality = FilterQuality.High,
                     colorFilter = Saturate
                 )
             }
