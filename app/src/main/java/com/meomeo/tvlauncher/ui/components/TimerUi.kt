@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TimerOff
@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -49,12 +50,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.meomeo.tvlauncher.R
 import com.meomeo.tvlauncher.timer.ViewingTimerStore
 import com.meomeo.tvlauncher.ui.PinResult
 import com.meomeo.tvlauncher.ui.theme.Danger
@@ -502,11 +506,10 @@ fun LockScreen(
                     focusScale = 1.1f,
                     ring = true
                 ) { _ ->
-                    Box(
-                        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFB4B4BC), Color(0xFF6C6C76)))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.Person, contentDescription = "Mở khóa", tint = Color.White.copy(alpha = 0.92f), modifier = Modifier.size(52.dp))
+                    // The adaptive launcher icon: its layers span 108dp but only the centre 72dp shows.
+                    Box(Modifier.fillMaxSize().clip(CircleShape)) {
+                        Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        Image(painterResource(R.drawable.ic_launcher_foreground), "Mở khóa", Modifier.fillMaxSize().scale(1.5f))
                     }
                 }
                 Spacer(Modifier.height(10.dp))

@@ -2,6 +2,7 @@ package com.meomeo.tvlauncher.ui.components
 
 import android.app.ActivityManager
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.view.KeyEvent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
@@ -77,6 +78,9 @@ import com.meomeo.tvlauncher.ui.theme.MenuBarTint
 import com.meomeo.tvlauncher.ui.theme.Separator
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Date
 import java.util.Locale
 
@@ -110,13 +114,21 @@ private fun wallpaperSize(context: Context, window: IntSize): IntSize {
     return IntSize((window.width * factor).toInt().coerceAtLeast(1), (window.height * factor).toInt().coerceAtLeast(1))
 }
 
-private fun wallpaperRequest(context: Context, data: Any, size: IntSize): ImageRequest =
-    ImageRequest.Builder(context)
+/**
+ * Decodes [data] into at most [size], and never larger than the file itself: Coil would otherwise
+ * stretch a small picture up to [size], which is blurry before it is even drawn.
+ */
+private suspend fun wallpaperRequest(context: Context, data: Any, size: IntSize): ImageRequest {
+    val source = withContext(Dispatchers.IO) { sourceSize(context, data) }
+    val target = if (source == IntSize.Zero) size
+    else IntSize(minOf(size.width, source.width), minOf(size.height, source.height))
+    return ImageRequest.Builder(context)
         .data(data)
         // An explicit size gives the decode a fixed cache key, so the prefetch below is a cache hit.
-        .size(size.width, size.height)
+        .size(target.width, target.height)
         .scale(Scale.FIT)
         .build()
+}
 
 /**
  * The desktop picture. Widescreen images fill the screen; portrait photos are shown whole in the
@@ -132,11 +144,12 @@ fun DesktopWallpaper(data: Any, nextData: Any?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val size = wallpaperSize(context, LocalWindowInfo.current.containerSize)
 
-    val bitmap by produceState<ImageBitmap?>(null, data, size) {
+    val wallpaper by produceState<LoadedWallpaper?>(null, data, size) {
         if (size.width <= 1) return@produceState
         val result = context.imageLoader.execute(wallpaperRequest(context, data, size))
         // Keep the previous picture if the new one fails to load.
-        (result as? SuccessResult)?.drawable?.toBitmap()?.asImageBitmap()?.let { value = it }
+        val image = (result as? SuccessResult)?.drawable?.toBitmap()?.asImageBitmap() ?: return@produceState
+        value = LoadedWallpaper(image, withContext(Dispatchers.IO) { sourceSize(context, data) })
     }
 
     LaunchedEffect(nextData, size) {
@@ -144,22 +157,43 @@ fun DesktopWallpaper(data: Any, nextData: Any?, modifier: Modifier = Modifier) {
     }
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        Crossfade(targetState = bitmap, animationSpec = tween(450), label = "wallpaper") { image ->
-            if (image != null) WallpaperImage(image)
+        val window = LocalWindowInfo.current.containerSize
+        Crossfade(targetState = wallpaper, animationSpec = tween(450), label = "wallpaper") { loaded ->
+            if (loaded != null) WallpaperImage(loaded, window)
         }
     }
 }
 
+/** A decoded wallpaper plus the pixel size of the file it came from (0 when unknown, e.g. a vector). */
+private class LoadedWallpaper(val image: ImageBitmap, val sourceSize: IntSize)
+
+/** Reads only the header of [data] (a File or a drawable id) to get its real pixel size. */
+private fun sourceSize(context: Context, data: Any): IntSize {
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    when (data) {
+        is File -> BitmapFactory.decodeFile(data.path, options)
+        is Int -> BitmapFactory.decodeResource(context.resources, data, options)
+        else -> return IntSize.Zero
+    }
+    return if (options.outWidth > 0 && options.outHeight > 0) IntSize(options.outWidth, options.outHeight) else IntSize.Zero
+}
+
+/** Most a picture may be enlarged to fill the screen before it starts to look soft. */
+private const val MaxFillUpscale = 1.25f
+
+/**
+ * A picture fills the screen only when that is safe: its shape is close to the screen's (little is
+ * cropped) and it has enough pixels (little is enlarged). Tall, near-square or small pictures are
+ * shown whole at their own size over a blurred copy instead.
+ */
 @Composable
-private fun WallpaperImage(image: ImageBitmap) {
-    val isPortrait = image.width.toFloat() / image.height < 1.6f
-    if (isPortrait) {
-        Box(Modifier.fillMaxSize()) {
-            BlurredFill()
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
-            Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        }
-    } else {
+private fun WallpaperImage(wallpaper: LoadedWallpaper, window: IntSize) {
+    val image = wallpaper.image
+    val source = wallpaper.sourceSize
+    val wideEnough = image.width.toFloat() / image.height >= 1.3f
+    val sharpEnough = source == IntSize.Zero || window.width <= 0 ||
+        maxOf(window.width.toFloat() / source.width, window.height.toFloat() / source.height) <= MaxFillUpscale
+    if (wideEnough && sharpEnough) {
         Image(
             bitmap = image,
             contentDescription = null,
@@ -167,6 +201,13 @@ private fun WallpaperImage(image: ImageBitmap) {
             contentScale = ContentScale.Crop,
             alignment = BiasAlignment(0f, -0.3f)
         )
+    } else {
+        Box(Modifier.fillMaxSize()) {
+            BlurredFill()
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
+            // Inside never enlarges, so a small picture stays sharp instead of being stretched.
+            Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Inside)
+        }
     }
 }
 
